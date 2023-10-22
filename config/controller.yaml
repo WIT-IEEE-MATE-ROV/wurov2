@@ -1,0 +1,32 @@
+Controllers:
+  Xbox:
+    grip: 2
+    grip_rotate: 3
+    lightOn: 4
+    lightOff: 5
+    killThrusters: 6
+    unkillThrusters: 7
+    safetyButton: 0
+    boostMode: 1
+    translationX_axis: 0
+    translationY_axis: 1
+    translationZ_axis: 3
+    depth_axis:
+      inputCount: 2
+      inputOne_Axis: 2
+      inputTwo_Axis: 3 #5
+  Logitech:
+    grip: 10
+    grip_rotate: 11
+    lightOn: 8
+    lightOff: 9
+    killThrusters: 6
+    unkillThrusters: 7
+    safetyButton: 0
+    boostMode: 1
+    translationX_axis: 1
+    translationY_axis: 0
+    translationZ_axis: 2
+    depth_axis:
+      inputCount: 1
+      inputOne_Axis: 3
