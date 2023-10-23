@@ -10,3 +10,6 @@ This repository uses the de-facto directory standard found in ROS workspaces.
 - `docs` contains more documentation.
 - `launch` contains launch files. The files here allow you to run existing configurations in simulation, real life, etc.
 - `msg` contains ROS message templates. These are used to pass information from one process to another.
+
+
+Install: sudo apt-get install ros-noetic-joy

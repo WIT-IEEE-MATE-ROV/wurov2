@@ -1,0 +1,4 @@
+<launch>
+    <node name="joy" pkg="joy" type="joy_node"/>
+    <node name="pca_linearMovement" pkg="wurov2_0" type="joystick_pub.py"/>
+</launch>
