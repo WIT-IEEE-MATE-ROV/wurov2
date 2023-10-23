@@ -8,6 +8,7 @@ def callback(data):
     xyz = rospy.Publisher('pca_linearMovement', Vector3, queue_size=10)
     rate = rospy.Rate(10) # 10hz
     
+    # Variable type of float64 for x,y,z
     v = Vector3()
     v.y = data.axes[1]
     v.x = data.axes[0]
@@ -15,15 +16,9 @@ def callback(data):
     
     
 def joystick_pub():
-
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
+    # Initilizes a default ros node 
     rospy.init_node('joystick', anonymous=True)
-
-    sub = rospy.Subscriber("joy", Joy, callback)
+    sub = rospy.Subscriber("joy", Joy, callback) # data recieved calls function callback()
 
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
