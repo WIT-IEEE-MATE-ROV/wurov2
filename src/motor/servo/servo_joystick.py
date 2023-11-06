@@ -13,6 +13,7 @@ i2c = busio.I2C(SCL, SDA)
 pca = PCA9685(i2c)
 pca.frequency = 50
 
+# Values for small servo motors min_pulse = 500 ; max_pulse = 2400
 servo0 = servo.Servo(pca.channels[0],min_pulse=1100, max_pulse=1900)
 servo1 = servo.Servo(pca.channels[1],min_pulse=1100, max_pulse=1900)
 
