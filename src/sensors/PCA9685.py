@@ -1,23 +1,12 @@
 """
+
 Python code for contolling the PCA9685
 
 """
-import rospy
-from std_msgs.msg import UInt16
-from geometry_msgs.msg import Vector3
+
 import time
-from board import *
-import asyncio
-import busio
-import smbus
-import Jetson.GPIO as GPIO
-
-# from smbus2 import SMBus
-#GPIO.setmode(GPIO.BOARD)
-
-# SDA_PIN = GPIO.setup(3, GPIO.OUT, initial=GPIO.HIGH)
-# SCL_PIN = GPIO.setup(5, GPIO.OUT, initial=GPIO.HIGH)
-
+from smbus import SMBus
+from typing import Tuple
 # regster num
 PCA_REG_PRE_SCALE = 0xFE
 PCA_REG_MODE_1 = 0x00
@@ -34,8 +23,8 @@ class PCA9685():
     
     def __init__(self, i2c_address:int, frequency_hz:float, measured_frequency = None):
         self.i2c_address = i2c_address
-        self.__i2c_bus = busio.I2C(SCL, SDA)
-        self.__sbus =   
+        self.__i2c_bus = SMBus(1)
+        self.osc_frequency_Mhz = 25 
 
         if measured_frequency is not None:
             self.__measured_frequency = measured_frequency
@@ -45,31 +34,16 @@ class PCA9685():
         self.__frequency_hz = frequency_hz
 
 
-    def reg_read(self, reg, result):
-        while not self.__i2c_bus.try_lock():
-            pass
-        try:
-            self.__i2c_bus.writeto_then_readfrom(self.i2c_address, bytes([reg]), result, in_start=0, out_start=0) 
-            self.__i2c_bus.unlock()
-              
-            return result
-        except Exception as e:
-            self.__i2c_bus.unlock()
-            raise e
-            
+    def __del__(self):
+        self.close()
 
-    def reg_write(self, reg, data):
-        while not self.__i2c_bus.try_lock():
-            pass
-        try:
-            buf = bytearray(1)
-            buf[0] = reg
-            buf.extend(data)
-            self.__i2c_bus.writeto(self.i2c_address, buf)
-            self.__i2c_bus.unlock()
-        except Exception as e:
-            self.__i2c_bus.unlock()
-            raise e
+
+    def  get_bus(self):
+        return self.__i2c_bus
+
+
+    def close(self):
+        self.__i2c_bus.close()
 
 
     def set_measured_frequency(self, measured_frequency:float):
@@ -77,38 +51,156 @@ class PCA9685():
 
 
     def restart(self):
-        buf = bytearray(1)
-        self.reg_read(PCA_REG_MODE_1, buf)
-        buf[0] |= PCA_M1_RESTART
-        self.reg_write(PCA_REG_MODE_1 ,buf)
+        mode_1 = self.__i2c_bus.read_byte_data(self.i2c_address, PCA_REG_MODE_1)
+        mode_1 |= PCA_M1_RESTART
+        self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+
+    
+    def software_reset(self):
+        self.__i2c_bus.write_byte(0x00, 6)  
+
+
+    def get_mode_1(self):
+        return self.__i2c_bus.read_byte_data(self.i2c_address, PCA_REG_MODE_1)
         
-
-    # def set_sleep(self, sleep_on:bool):
-    #     mode_1 = bytearray(1)
-    #     print("about to read in sleep")
-    #     self.reg_read(PCA_REG_MODE_1, mode_1)
-    #     sleep_state = mode_1[0] & PCA_M1_SLEEP
-    #     if sleep_on and not sleep_state:
-    #         mode_1[0] |= PCA_M1_SLEEP
-    #         print(mode_1[0])
-    #         self.reg_write(PCA_REG_MODE_1, mode_1)
-    #     elif not sleep_on and sleep_state:
-    #         mode_1[0] &= ~PCA_M1_SLEEP
-    #         print(mode_1[0])
-    #         self.reg_write(PCA_REG_MODE_1, mode_1)
-
+    
+    def get_prescale(self):
+        return self.__i2c_bus.read_byte_data(self.i2c_address, PCA_REG_PRE_SCALE)
 
 
     def setup(self):
-        ... 
+        self.restart()
+        time.sleep(0.01)  
+
+        mode_1 = PCA_M1_AUTO_INC | 1
+        self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+        self.set_prescale(100)
 
 
-p = PCA9685(0x40, 100)
-w = [0]
-print("before", w)
-print(p.reg_read(PCA_REG_MODE_1, w))
-print("after", w)
+    def set_sleep(self, sleep_on:bool):
+        mode_1 = self.__i2c_bus.read_byte_data(self.i2c_address, PCA_REG_MODE_1)
+        sleep_state = mode_1 & PCA_M1_SLEEP
+        print("Sleep State: ", sleep_state)
+        if sleep_on and not sleep_state:
+            mode_1 |= PCA_M1_SLEEP
+            self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+        elif not sleep_on and sleep_state:
+            mode_1 &= ~PCA_M1_SLEEP
+            self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
 
-print(p.reg_write(PCA_REG_MODE_1, bytes([PCA_M1_AUTO_INC])))
-print(p.reg_read(PCA_REG_MODE_1, w))
-print("after", w)
+
+    def use_extclk(self):
+        mode_1 = self.__i2c_bus.read_byte_data(self.i2c_address, PCA_REG_MODE_1)
+        extclk_state = mode_1 & PCA_M1_EXTCLK
+        if not extclk_state:
+            sleep_state = mode_1 & PCA_M1_SLEEP
+            if not sleep_state:
+                mode_1 |= PCA_M1_SLEEP
+                self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+            mode_1 |= PCA_M1_EXTCLK
+            self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+            if not sleep_state:
+                mode_1 &= ~PCA_M1_SLEEP
+                self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+
+        
+    def set_prescale(self, pwm_freq_hz: float):
+        mode_1 = self.__i2c_bus.read_byte_data(self.i2c_address, PCA_REG_MODE_1)
+        sleep_state = mode_1 & PCA_M1_SLEEP
+        if not sleep_state:
+            mode_1 |= PCA_M1_SLEEP
+            self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+
+        prescale_val = round((self.osc_frequency_Mhz * 1000000.0) / (4096.0 * pwm_freq_hz)) -1 
+        print("prescale_val: ", prescale_val)   
+        self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_PRE_SCALE, prescale_val)
+        
+        if not sleep_state:
+            mode_1 &= ~PCA_M1_SLEEP
+            self.__i2c_bus.write_byte_data(self.i2c_address, PCA_REG_MODE_1, mode_1)
+
+
+    def set_counts(self, control_num:int, on_counts:int, off_counts:int):
+        ctrl_reg = (control_num * 4) + 6
+        ctrl_data = [0]*4
+
+        ctrl_data[0] = on_counts & 0xFF
+        ctrl_data[1] = (on_counts >> 8) & 0x0F 
+        ctrl_data[2] = off_counts & 0xFF
+        ctrl_data[3] = (off_counts >> 8) & 0x0F 
+
+        self.__i2c_bus.write_i2c_block_data(self.i2c_address, ctrl_reg, ctrl_data)
+
+    def get_counts(self, control_num) -> Tuple[int, int]:
+        ctrl_reg = (control_num * 4) + 6
+        ctrl_data = self.__i2c_bus.read_i2c_block_data(self.i2c_address, ctrl_reg, 4)
+        on_counts = ctrl_data[0] + ((ctrl_data[1] & 0xFF) << 8 )
+        off_counts = ctrl_data[2] + ((ctrl_data[3] & 0xFF) << 8 )
+
+        return (on_counts, off_counts)
+
+
+    def set_duty_cycle(self, control_num:int, duty_cycle:float):
+        pwm_period_us = (1.0 / self.__measured_frequency) * 1_000_000.0
+        us_on = (((duty_cycle + 1.0) / 2.0) * 800.0) +1100.0
+        us_on_ratio = us_on / pwm_period_us
+
+        off_counts = round(us_on_ratio * 4096.0)
+        on_counts = 0
+
+        self.set_counts(control_num, on_counts, off_counts)
+
+
+    def set_duty_cycles(self, start_ctrl:int, end_ctrl:int, duty_cycles):
+        end_ctrl += 1
+        ctrl_len = end_ctrl - start_ctrl
+        pwm_period_us = (1.0 / self.__measured_frequency) * 1_000_000.0
+        ctrl_data = [0] * (ctrl_len * 4)
+        print(ctrl_data)
+
+        for i in range(ctrl_len):
+            print(i)
+            us_on = (((duty_cycles[i] + 1.0) / 2.0) * 800.0) +1100.0
+            us_on_ratio = us_on / pwm_period_us
+            off_counts = round(us_on_ratio * 4096.0)
+            on_counts = 0
+            ctrl_reg = i * 4
+
+            ctrl_data[ctrl_reg] = on_counts & 0xFF
+            ctrl_data[ctrl_reg + 1] = (on_counts >> 8) & 0x0F 
+            ctrl_data[ctrl_reg + 2] = off_counts & 0xFF
+            ctrl_data[ctrl_reg + 3] = (off_counts >> 8) & 0x0F 
+
+        
+        print(ctrl_data)
+
+
+
+        start_reg = start_ctrl * 4 + 6
+        end_reg = end_ctrl * 4 + 6
+
+        reg_length = end_reg - start_reg
+
+        self.__i2c_bus.write_i2c_block_data(self.i2c_address, start_reg, ctrl_data)
+
+
+
+    
+
+
+
+p = PCA9685(0x40, 100, 103.7)
+p.software_reset()
+p.setup()
+p.set_sleep(False)
+
+p.set_duty_cycles(2, 7, range(6))
+
+# p.set_duty_cycle(0, 0)
+
+
+
+print(p.get_counts(0))
+
+print(p.get_bus().read_i2c_block_data(0x40, 0x00, 4))
+p.close()
