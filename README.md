@@ -12,4 +12,5 @@ This repository uses the de-facto directory standard found in ROS workspaces.
 - `msg` contains ROS message templates. These are used to pass information from one process to another.
 
 
-Install: sudo apt-get install ros-noetic-joy
+Install: sudo apt-get install ros-noetic-joy  
+Install imu madgwick filter from https://github.com/CCNYRoboticsLab/imu_tools
