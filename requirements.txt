@@ -13,3 +13,4 @@ adafruit-blinka
 opencv-python
 numpy
 rospy
+smbus-cffi
