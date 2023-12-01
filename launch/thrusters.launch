@@ -1,0 +1,3 @@
+<launch>
+    <node name="thrusters" pkg="wurov2_0" type="thruster_node.py"/>
+</launch>
