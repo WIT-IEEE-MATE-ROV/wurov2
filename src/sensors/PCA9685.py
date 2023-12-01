@@ -131,6 +131,7 @@ class PCA9685():
 
         self.__i2c_bus.write_i2c_block_data(self.i2c_address, ctrl_reg, ctrl_data)
 
+
     def get_counts(self, control_num) -> Tuple[int, int]:
         ctrl_reg = (control_num * 4) + 6
         ctrl_data = self.__i2c_bus.read_i2c_block_data(self.i2c_address, ctrl_reg, 4)
@@ -151,15 +152,30 @@ class PCA9685():
         self.set_counts(control_num, on_counts, off_counts)
 
 
-    def set_duty_cycles(self, start_ctrl:int, end_ctrl:int, duty_cycles):
-        end_ctrl += 1
+    def set_us(self, control_num:int, us:int):
+        pwm_period_us = (1.0 / self.__measured_frequency) * 1_000_000.0
+        us_on_ratio = us / pwm_period_us
+
+        off_counts = round(us_on_ratio * 4096.0)
+        on_counts = 0
+
+        self.set_counts(control_num, on_counts, off_counts)
+
+
+
+    def set_duty_cycles(self, start_ctrl:int, duty_cycles):
+        end_ctrl = len(duty_cycles) + start_ctrl
+        if end_ctrl > 15:
+            raise IndexError(f"There only 16 channels on the PCA. Attempted to access channel {end_ctrl}")
+
+        print('end_ctrl: ', end_ctrl)
+        
         ctrl_len = end_ctrl - start_ctrl
         pwm_period_us = (1.0 / self.__measured_frequency) * 1_000_000.0
         ctrl_data = [0] * (ctrl_len * 4)
-        print(ctrl_data)
+        
 
         for i in range(ctrl_len):
-            print(i)
             us_on = (((duty_cycles[i] + 1.0) / 2.0) * 800.0) +1100.0
             us_on_ratio = us_on / pwm_period_us
             off_counts = round(us_on_ratio * 4096.0)
@@ -174,31 +190,35 @@ class PCA9685():
         
         print(ctrl_data)
 
-
-
         start_reg = start_ctrl * 4 + 6
         end_reg = end_ctrl * 4 + 6
 
         reg_length = end_reg - start_reg
+        print('reg_length: ', reg_length)
+        
+        if end_reg > 69:
+            raise OverflowError("[ERROR] PCA9685 only has 16 control slots")
 
-        self.__i2c_bus.write_i2c_block_data(self.i2c_address, start_reg, ctrl_data)
+        print("Ctrl data 1: ", ctrl_data[0:32])
+        self.__i2c_bus.write_i2c_block_data(self.i2c_address, start_reg, ctrl_data[0:32])
+        print('Start reg: ', start_reg)
+        if reg_length > 32:
+            ctrl_data_2 = ctrl_data[32:64]
+            print("Ctrl data 2: ", ctrl_data_2)
+            ctrl_data_2_start = start_reg + 32
+            print('Ctrl data 2 start: ', ctrl_data_2_start)
+            self.__i2c_bus.write_i2c_block_data(self.i2c_address, ctrl_data_2_start, ctrl_data_2)
+        
+            
 
 
 
-    
-
-
-
-p = PCA9685(0x40, 100, 103.7)
+p = PCA9685(0x42, 100, 103.7)
 p.software_reset()
 p.setup()
 p.set_sleep(False)
 
-p.set_duty_cycles(2, 7, range(6))
-
-# p.set_duty_cycle(0, 0)
-
-
+p.set_duty_cycles(0, [1]*10)
 
 print(p.get_counts(0))
 
