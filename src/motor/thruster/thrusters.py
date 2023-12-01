@@ -1,14 +1,78 @@
-#!/usr/bin/env python3
-
-import rospy
-from std_msgs.msg import Float64
-from sensor_msgs.msg import Joy
-from geometry_msgs.msg import Vector3, Twist
-from pca import PCA9685
-import time
 import numpy as np
 import math
+from pca import PCA9685
 
+# 1: Front Left
+# 2: Front Right
+# 3: Back Left
+# 4: Back Right
+
+# TODO: Redefine these parameters once robot is ready
+THRUSTER_ANGLE_DEG = 45
+# THRUSTER_ANGLE_DEG = math.acos(.875) * 180/np.pi # Sanity check angle
+thruster_angles = np.array(
+    [THRUSTER_ANGLE_DEG, THRUSTER_ANGLE_DEG, THRUSTER_ANGLE_DEG, THRUSTER_ANGLE_DEG]) * np.pi / 180
+THRUSTER_LENGTH_DISTANCE_M = 1
+THRUSTER_WIDTH_DISTANCE_M = .5
+THRUSTER_DIAGONAL_DISTANCE_M = math.sqrt(THRUSTER_WIDTH_DISTANCE_M ** 2 + THRUSTER_LENGTH_DISTANCE_M ** 2)
+HALF_LENGTH = THRUSTER_LENGTH_DISTANCE_M / 2
+HALF_WIDTH = THRUSTER_WIDTH_DISTANCE_M / 2
+HALF_DIAGONAL = THRUSTER_DIAGONAL_DISTANCE_M / 2
+LENGTH_DIAGONAL_ANGLE_RAD = -math.acos(THRUSTER_LENGTH_DISTANCE_M / THRUSTER_DIAGONAL_DISTANCE_M)
+
+YAW_TANGENTIAL_FORCE = math.sin(
+    thruster_angles[0] - LENGTH_DIAGONAL_ANGLE_RAD)
+
+horizontal_thruster_config = np.array([[math.cos(thruster_angles[0]),
+                                        math.cos(thruster_angles[1]),
+                                        -math.cos(thruster_angles[2]),
+                                        -math.cos(thruster_angles[3])],
+                                       [math.sin(thruster_angles[0]),
+                                        -math.sin(thruster_angles[1]),
+                                        math.sin(thruster_angles[2]),
+                                        -math.sin(thruster_angles[3])],
+                                       [HALF_DIAGONAL * math.sin(
+                                           thruster_angles[0] - LENGTH_DIAGONAL_ANGLE_RAD),
+                                        -HALF_DIAGONAL * math.sin(
+                                            thruster_angles[1] - LENGTH_DIAGONAL_ANGLE_RAD),
+                                        -HALF_DIAGONAL * math.sin(
+                                            thruster_angles[2] - LENGTH_DIAGONAL_ANGLE_RAD),
+                                        HALF_DIAGONAL * math.sin(
+                                            thruster_angles[3] - LENGTH_DIAGONAL_ANGLE_RAD)]])
+
+h_U, h_S, h_V_T = np.linalg.svd(horizontal_thruster_config)
+h_S = np.diag(h_S)
+h_S_inv = np.linalg.inv(h_S)
+
+h_V = np.transpose(h_V_T)
+h_S_inv_0 = np.vstack([h_S_inv, [0, 0, 0]])
+h_U_T = np.transpose(h_U)
+
+# Assuming positive thrust forces up
+vertical_thruster_config = np.array([[1, 1, 1, 1],
+                                     [-HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],
+                                     [-HALF_WIDTH, HALF_WIDTH, -HALF_WIDTH, HALF_WIDTH]])
+
+v_U, v_S, v_V_T = np.linalg.svd(vertical_thruster_config)
+v_S = np.diag(v_S)
+v_S_inv = np.linalg.inv(v_S)
+
+v_V = np.transpose(v_V_T)
+v_S_inv_0 = np.vstack([v_S_inv, [0, 0, 0]])
+v_U_T = np.transpose(v_U)
+
+horizontal_factor = h_V @ h_S_inv_0 @ h_U_T
+vertical_factor = v_V @ v_S_inv_0 @ v_U_T
+
+# Constants to use for feedforward control
+MAX_THRUST_KGF = 1.5
+MAX_NET_X_KGF = MAX_THRUST_KGF * 4 * math.cos(thruster_angles[0])
+MAX_NET_Y_KGF = MAX_THRUST_KGF * 4 * math.sin(thruster_angles[0])
+MAX_NET_Z_KGF = MAX_THRUST_KGF * 4
+MAX_NET_YAW_MOMENT_KGF = MAX_THRUST_KGF * 4 * YAW_TANGENTIAL_FORCE
+MAX_NET_PITCH_MOMENT_KGF = MAX_THRUST_KGF * 4 * HALF_LENGTH
+MAX_NET_ROLL_MOMENT_KGF = MAX_THRUST_KGF * 4 * HALF_WIDTH
+# Logistic boolean input: input(t) = 1 / (1 + e^(-8 * (t - .5)))
 
 t100_pwm_value = [
     1100, 1110, 1120, 1130, 1140, 1150, 1160, 1170, 1180, 1190, 1200, 1210, 1220, 1230, 1240, 1250, 1260, 1270, 1280,
@@ -34,10 +98,12 @@ t100_mid = int(len(t100_thrust_12v) / 2)
 t100_left = np.poly1d(np.polyfit(t100_pwm_value[:(t100_mid - 2)], t100_thrust_12v[:(t100_mid - 2)], 2))
 t100_right = np.poly1d(np.polyfit(t100_pwm_value[(t100_mid + 2):], t100_thrust_12v[(t100_mid + 2):], 2))
 
+
 def quadratic_solve(y, a, b, c):
     x1 = -b / (2 * a)
     x2 = math.sqrt(b ** 2 - 4 * a * (c - y)) / (2 * a)
     return (x1 + x2), (x1 - x2)
+
 
 def pwm_to_thrust(pwm_on, voltage, use_t100=True):
     reversed_pwm = pwm_on < 1500
@@ -53,51 +119,21 @@ def pwm_to_thrust(pwm_on, voltage, use_t100=True):
     right_x = quadratic_solve(y, t_right.coeffs[0], t_right.coeffs[1], t_right.coeffs[2])[0 if reversed_pwm else 1]
 
     return (pwm_on, y), (right_x, y)
-    
 
-# --Horizontal Walsh matrix solve setup--
-motor_angle = 45 * (math.pi / 180)
-robot_length = 10
-robot_width = 10
-motor_origin_hypot = math.sqrt(robot_width ** 2 + robot_length ** 2) / 2
-left_phi = math.asin((-robot_width / 2) / motor_origin_hypot)
-right_phi = math.asin((robot_width / 2) / motor_origin_hypot)
 
-q_inv = np.diag([1 / math.sin(motor_angle),
-                1 / math.cos(motor_angle),
-                1 / (motor_origin_hypot * math.sin(motor_angle - left_phi))])
+def desaturate_thrust_outputs(outputs, max_thrust):
+    real_max_thrust = 0
+    for i in range(len(outputs)):
+        real_max_thrust = max(real_max_thrust, abs(outputs[i]))
 
-W = np.array([[1, 1, 1, 1],
-              [1, 1, -1, -1],
-              [1, -1, 1, -1],
-              [1, -1, -1, 1]])
-
-# --Vertical Thruster SVD solve setup--
-half_len = robot_length / 2
-half_width = robot_width / 2
-# Assuming positive thrust forces up
-vert_T = np.array([[1, 1, 1, 1],
-                   [-half_len, -half_len, half_len, half_len],
-                   [-half_width, half_width, -half_width, half_width]])
-
-U, S, V_T = np.linalg.svd(vert_T)
-S = np.diag(S)
-# print(U)
-# print(S)
-# print(V_T)
-# exit(0)
-S_inv = np.linalg.inv(S)
-
-V = np.transpose(V_T)
-S_inv_0 = np.vstack([S_inv, [0, 0, 0]])
-U_T = np.transpose(U)
-
-desired_twist = Twist()
+    if real_max_thrust > max_thrust:
+        for i in range(len(outputs)):
+            outputs[i] = outputs[i] / real_max_thrust * max_thrust
 
 
 def get_vert_thruster_outputs(z_force, pitch, roll):
     forces = np.array([z_force, pitch, roll])
-    return V @ S_inv_0 @ U_T @ forces
+    return vertical_factor @ forces
 
 
 def get_vert_thruster_outputs_simple(upward_force, pitch, roll):
@@ -107,87 +143,57 @@ def get_vert_thruster_outputs_simple(upward_force, pitch, roll):
                      upward_force - pitch + roll])
 
 
-def get_horizontal_thruster_outputs(x, y, theta):
-    thrust_desired = np.array([x, y, theta])
+def get_horizontal_thruster_outputs(x, y, yaw):
+    net_thrust_desired = np.array([x, y, yaw])
+    return horizontal_factor @ net_thrust_desired
 
-    a = q_inv @ thrust_desired
 
-    r = np.insert(a, 0, np.array([0]))
-
-    outputs = .25 * W @ r
-
+def get_thruster_outputs(x, y, z, yaw, pitch, roll, max_thrust=MAX_THRUST_KGF) -> np.array:
+    horizontal = get_horizontal_thruster_outputs(x, y, yaw)
+    vertical = get_vert_thruster_outputs(z, pitch, roll)
+    outputs = np.concatenate((horizontal, vertical))
+    desaturate_thrust_outputs(outputs, max_thrust)
     return outputs
 
-def rotate_2d(x,y, angle_rad):
-    x_p = x * np.cos(angle_rad) - y * np.sin(angle_rad)
-    y_p = x * np.sin(angle_rad) + y * np.cos(angle_rad)
-    return x_p , y_p
 
-def callback_navigation(data):
-    # Does this once joystick sends data
-    left_trigger = (-data.axes[2] + 1) / 2 
-    right_trigger = (-data.axes[5] + 1) / 2 
-    left_stick_x = data.axes[0]
-    left_stick_y = data.axes[1]
-
-    left_stick_x, left_stick_y = rotate_2d(left_stick_x, left_stick_y, -np.pi/2)
-
-    desired_twist.linear.x = left_stick_x
-    desired_twist.linear.y = left_stick_y
-    desired_twist.linear.z = right_trigger - left_trigger # no press = 1, full press = -1
-    # print(f'right_trigger: {data.axes[5]}')
+def thrusts_to_us(thrusts: list):
+    micros = [0] * len(thrusts)
+    for i in range(len(thrusts)):
+        reverse_thrust = thrusts[i] < 0
+        if thrusts[i] > 0:
+            pwm_us = quadratic_solve(thrusts[i], t100_right.c[0], t100_right.c[1], t100_right.c[2])[0 if reverse_thrust else 1]
+        else:
+            pwm_us = quadratic_solve(thrusts[i], t100_left.c[0], t100_left.c[1], t100_left.c[2])[0 if reverse_thrust else 1]
+        micros[i] = pwm_us
     
-    
-def callback_angle(data):
-    # Does this once Imu data comes in
-    # desired_twist.angular.x = data.x # Roll degress
-    # desired_twist.angular.y = data.y # pitch degress
-    # desired_twist.angular.z = data.z # yaw degress
-    pass
-    
-def thruster_pub():
-    global desired_twist
-    # Initilizes a default ros node 
-    rospy.init_node('thrusters', anonymous=True)
-    sub = rospy.Subscriber("joy", Joy, callback_navigation) # Gets data from joy msg in float32 array for axes and int32 array for buttons
-    sub2 = rospy.Subscriber("orientation", Vector3, callback_angle) # Has data.x as roll = x, pitch = y, yaw = z in degrees
-    rate = rospy.Rate(10) # 10hz
-    
-    # pca = PCA9685(0x40, 100)
-
-    while not rospy.is_shutdown():
-        horizontal_output = get_horizontal_thruster_outputs(desired_twist.linear.x, desired_twist.linear.y, desired_twist.angular.z)
-        vertical_output = get_vert_thruster_outputs(desired_twist.linear.z, desired_twist.angular.y, desired_twist.angular.x)
-
-        print(f'horizontal_output: {horizontal_output}\nvertical_output: {vertical_output}\n\n')
-
-        # # Example workflow
-        # # Error and kP values
-        # error = 0
-        # pitch_error = 0
-        # pitch_kP = 0
-        # kp = 0
-
-        # pitch_output = pitch_kP * pitch_error
-
-        # vertical_output = get_vert_thruster_outputs(0, pitch_output, 0)
-        # pca.set_duty_cycle(0, vertical_output[0])
-        # pca.set_duty_cycle(1, vertical_output[1])
+    return micros
 
 
-        # # Calculate PID output
-        # p_out = error * kp
+class Thrusters:
+    # Horizontal thruster PCA slots
+    __FLH_ID = 0
+    __FRH_ID = 1
+    __BLH_ID = 2
+    __BRH_ID = 3
+    # Vertical thruster PCA slots
+    __FLV_ID = 4
+    __FRV_ID = 5
+    __BLV_ID = 6
+    __BRV_ID = 7
+
+
+    def __init__(self):
+        self.__pca = PCA9685(0x40, 100, measured_frequency_hz=100)
         
-        # # Clamp output from -1 to 1
-        # p_out = max(min(p_out, 1), -1)
 
-        # # Send output to PCA at slot 0
-        # pca.set_duty_cycle(0, p_out)
-        
-        rate.sleep()
+    @property
+    def pca(self):
+        return self.__pca
     
-    # spin() simply keeps python from exiting until this node is stopped
-    rospy.spin()
 
-if __name__ == '__main__':
-    thruster_pub()
+    def set_thrust(self, x, y, z, yaw, pitch, roll):
+        thruster_outputs = get_thruster_outputs(x, y, z, yaw, pitch, roll)
+        pca_outputs = thrusts_to_us(thruster_outputs)
+        # To automatically set stuff, make a dict of the ids then sort based off of slot number, then write adjacent stuff together
+        self.__pca.set_us(Thrusters.__FLH_ID, pca_outputs)
+        return thruster_outputs

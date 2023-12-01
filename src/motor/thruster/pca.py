@@ -21,9 +21,34 @@ PCA_CTRL_REG_OFFSET = 0x06
 
 
 class PCA9685:
+    '''Python Class to controll a PCA9685 over an I2C bus.
+        
+    	Allows for more fine tune control of each PWM signal coming from one of 16 channels.
+   
+        Referenced this documentation -> https://cdn-shop.adafruit.com/datasheets/PCA9685.pdf
+    	
+        This is a good reference if you need to see what each register for the PCA dose.
+
+    '''
+
 
     def __init__(self, i2c_address: int, frequency_hz: float, measured_frequency_hz=None, osc_frequency_mhz=None,
                  bus_num=1):
+        '''
+        Parameters
+        ----------
+
+        i2c_address : int
+            The unique address of the PCA9585 (default is 0x40)
+
+        frequency_hz : int
+            output frequenct of the PWM signal 
+
+        measured_frequency : float
+            measured frequency of PCAs signals to adjust for accuracy
+        
+        '''
+
         self.__i2c_address = i2c_address
         self.__i2c_bus = SMBus(bus_num)
 
@@ -39,41 +64,80 @@ class PCA9685:
 
         self.__frequency_hz = frequency_hz
 
+
     def __del__(self):
         self.close()
+
 
     @property
     def i2c_bus(self):
         return self.__i2c_bus
 
+
     @property
     def i2c_address(self):
         return self.__i2c_address
+
 
     @property
     def measured_frequency_hz(self):
         return self.__measured_frequency
 
+
     @measured_frequency_hz.setter
     def measured_frequency_hz(self, hz: float):
         self.__measured_frequency = hz
 
+
     def close(self):
-        self.__i2c_bus.close()
+        try:
+            if self.__i2c_bus is not None:
+                self.__i2c_bus.close()
+        except AttributeError:
+            print('No I2C bus object was created so it wasn\'t closed')
+
 
     def restart(self):
+        '''
+        Restarts all the previously active PWM channels
+            
+        sets the RESTART bit (MODE1 bit 7) to logic 1 at end of PWM refresh cycle
+        The contents of each PWM register are held valid when the clock is off.
+        
+        '''
+
         mode_1 = self.__i2c_bus.read_byte_data(self.__i2c_address, PCA_REG_MODE_1)
         mode_1 |= PCA_M1_RESTART
         self.__i2c_bus.write_byte_data(self.__i2c_address, PCA_REG_MODE_1, mode_1)
 
+
     def software_reset(self):
+        '''
+        Allows for the PCA to be reset to the inital 'power up state' without turning the PCA on and off
+        '''
+
         self.__i2c_bus.write_byte(0x00, 6)
 
+
     def get_mode_1(self):
+        '''
+        Returns access to Mode1 register
+        '''
+
         return self.__i2c_bus.read_byte_data(self.__i2c_address, PCA_REG_MODE_1)
 
+
     def get_prescale(self):
+        '''
+        Returns the frequency at which the PCA outputs modulate 
+
+        The max PWM frequency is 1526Hz
+        The min PWM frequency is 24Hz
+
+        '''
+
         return self.__i2c_bus.read_byte_data(self.__i2c_address, PCA_REG_PRE_SCALE)
+
 
     def setup(self):
         self.restart()
@@ -83,7 +147,22 @@ class PCA9685:
         self.__i2c_bus.write_byte_data(self.__i2c_address, PCA_REG_MODE_1, mode_1)
         self.set_pwm_frequency(self.__frequency_hz)
 
+
     def set_sleep(self, sleep_on: bool):
+        '''
+        Puts the PCA into low power mode by turning off its oscillator
+        NOTE: outputs cannot be turned on or off
+
+        Parameters
+        ----------
+
+            sleep_on : bool
+                Sets the sleep state on or 
+            
+                True -> on
+                False -> off
+
+        '''
         mode_1 = self.__i2c_bus.read_byte_data(self.__i2c_address, PCA_REG_MODE_1)
         sleep_state = mode_1 & PCA_M1_SLEEP
         print("Sleep State: ", sleep_state)
@@ -94,7 +173,17 @@ class PCA9685:
             mode_1 &= ~PCA_M1_SLEEP
             self.__i2c_bus.write_byte_data(self.__i2c_address, PCA_REG_MODE_1, mode_1)
 
+
     def use_extclk(self):
+        '''
+        Allows for the use of an external clock on the PCA.   
+        This function will put the PCA to sleep to allow for external clocks to be used.
+
+    	Inorder to rest the PCA to the default clock the PCA needs to be software_reset().
+    	If this doesn't work try power cycling the PCA.
+
+        '''
+
         mode_1 = self.__i2c_bus.read_byte_data(self.__i2c_address, PCA_REG_MODE_1)
         extclk_state = mode_1 & PCA_M1_EXTCLK
         if not extclk_state:
@@ -108,7 +197,14 @@ class PCA9685:
                 mode_1 &= ~PCA_M1_SLEEP
                 self.__i2c_bus.write_byte_data(self.__i2c_address, PCA_REG_MODE_1, mode_1)
 
+
     def set_pwm_frequency(self, pwm_freq_hz: float):
+        '''Sets the frequency of the output PWM signals
+
+            The max PWM frequency is 1526Hz
+            The min PWM frequency is 24Hz
+
+        '''
         # Clamp pwm frequency to max and min values
         pwm_freq_hz = max(min(pwm_freq_hz, 1526), 26)
 
@@ -128,6 +224,7 @@ class PCA9685:
 
         self.__frequency_hz = pwm_freq_hz
 
+
     def set_counts(self, control_num: int, on_counts: int, off_counts: int):
         ctrl_reg = (control_num * 4) + 6
         ctrl_data = [0] * 4
@@ -139,6 +236,7 @@ class PCA9685:
 
         self.__i2c_bus.write_i2c_block_data(self.__i2c_address, ctrl_reg, ctrl_data)
 
+
     def get_counts(self, control_num) -> Tuple[int, int]:
         ctrl_reg = (control_num * 4) + 6
         ctrl_data = self.__i2c_bus.read_i2c_block_data(self.__i2c_address, ctrl_reg, 4)
@@ -146,6 +244,7 @@ class PCA9685:
         off_counts = ctrl_data[2] + ((ctrl_data[3] & 0xFF) << 8)
 
         return on_counts, off_counts
+
 
     def set_duty_cycle(self, control_num: int, duty_cycle: float):
         pwm_period_us = (1.0 / self.__measured_frequency) * 1_000_000.0
@@ -157,7 +256,8 @@ class PCA9685:
 
         self.set_counts(control_num, on_counts, off_counts)
 
-    def set_us(self, control_num: int, *us: int):
+
+    def set_us(self, control_num: int, us: list):
         end_ctrl = len(us) + control_num
         if end_ctrl > 15:
             raise IndexError(f"There only 16 channels on the PCA. Attempted to access channel {end_ctrl}")
@@ -169,7 +269,7 @@ class PCA9685:
         for i in range(ctrl_len):
             us_on = us[i]
             us_on_ratio = us_on / pwm_period_us
-            off_counts = round(us_on_ratio * 4096.0)
+            off_counts = int(round(us_on_ratio * 4096.0))
             on_counts = 0
             ctrl_reg = i * 4
 
@@ -194,6 +294,7 @@ class PCA9685:
             ctrl_data_2 = ctrl_data[32:64]
             ctrl_data_2_start = start_reg + 32
             self.__i2c_bus.write_i2c_block_data(self.__i2c_address, ctrl_data_2_start, ctrl_data_2)
+
 
     def set_duty_cycles(self, start_ctrl: int, duty_cycles):
         end_ctrl = len(duty_cycles) + start_ctrl
