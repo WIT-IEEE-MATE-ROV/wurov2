@@ -121,6 +121,7 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  lib/libi2c/include
 )
 
 ## Declare a C++ library
