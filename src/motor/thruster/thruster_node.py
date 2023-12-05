@@ -39,6 +39,10 @@ def callback_angle(data):
     # desired_twist.angular.z = data.z # yaw degress
     pass
 
+
+def callback_euler(data):
+    print(f'thruster_node recieved: {data}')
+
     
 def thruster_pub():
     global desired_twist
@@ -48,13 +52,13 @@ def thruster_pub():
 
     # Initilizes a default ros node 
     rospy.init_node('thrusters', anonymous=True)
-    sub = rospy.Subscriber("joy", Joy, callback_navigation) # Gets data from joy msg in float32 array for axes and int32 array for buttons
-    sub2 = rospy.Subscriber("orientation", Vector3, callback_angle) # Has data.x as roll = x, pitch = y, yaw = z in degrees
+    # sub = rospy.Subscriber("joy", Joy, callback_navigation) # Gets data from joy msg in float32 array for axes and int32 array for buttons
+    # sub2 = rospy.Subscriber("orientation", Vector3, callback_angle) # Has data.x as roll = x, pitch = y, yaw = z in degrees
+    euler_sub = rospy.Subscriber("bno/euler", Vector3, callback_euler)
     rate = rospy.Rate(10) # 10hz
 
     while not rospy.is_shutdown():
-        thruster_output = thrusters.set_thrust(desired_twist.linear.x, desired_twist.linear.y, desired_twist.linear.z, 
-                             desired_twist.angular.z, desired_twist.angular.y, desired_twist.angular.x)
+        thruster_output = None
 
         print(f'thruster_output: {thruster_output}\n')
         

@@ -1,5 +1,8 @@
 import numpy as np
+from scipy.spatial.transform import Rotation
 import math
+from geometry_msgs.msg import Vector3, Twist
+
 from pca import PCA9685
 
 # 1: Front Left
@@ -100,6 +103,9 @@ t100_right = np.poly1d(np.polyfit(t100_pwm_value[(t100_mid + 2):], t100_thrust_1
 
 
 def quadratic_solve(y, a, b, c):
+    """
+    
+    """
     x1 = -b / (2 * a)
     x2 = math.sqrt(b ** 2 - 4 * a * (c - y)) / (2 * a)
     return (x1 + x2), (x1 - x2)
@@ -156,6 +162,12 @@ def get_thruster_outputs(x, y, z, yaw, pitch, roll, max_thrust=MAX_THRUST_KGF) -
     return outputs
 
 
+def get_thruster_outputs(net_thrust_xyz_ypr, max_thrust=MAX_THRUST_KGF):
+    return get_thruster_outputs(net_thrust_xyz_ypr[0], net_thrust_xyz_ypr[1], net_thrust_xyz_ypr[2],
+                                net_thrust_xyz_ypr[3],net_thrust_xyz_ypr[4],net_thrust_xyz_ypr[5],
+                                max_thrust=max_thrust)
+
+
 def thrusts_to_us(thrusts: list):
     micros = [0] * len(thrusts)
     for i in range(len(thrusts)):
@@ -167,6 +179,58 @@ def thrusts_to_us(thrusts: list):
         micros[i] = pwm_us
     
     return micros
+
+
+def rotate_2d(x,y, angle_rad):
+    x_p = x * np.cos(angle_rad) - y * np.sin(angle_rad)
+    y_p = x * np.sin(angle_rad) + y * np.cos(angle_rad)
+    return x_p , y_p
+
+
+def euler_from_quaternion(x, y, z, w):
+    """
+    Convert a quaternion into euler angles (roll, pitch, yaw)
+    roll is rotation around x in radians (counterclockwise)
+    pitch is rotation around y in radians (counterclockwise)
+    yaw is rotation around z in radians (counterclockwise)
+    """
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll_x = math.atan2(t0, t1)
+    
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch_y = math.asin(t2)
+    
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw_z = math.atan2(t3, t4)
+    
+    return roll_x, pitch_y, yaw_z # in radians
+
+
+yaw_pid = [0, 0, 0]
+pitch_pid = [0, 0, 0]
+roll_pid = [0, 0, 0]
+
+
+class PIDController:
+    # TODO: EWMA some inputs?
+    def __init__(self, p=0, i=0, d=0, f=0, i_zone=0, output_limit=0, ):
+        pass
+
+    
+    def set_setpoint(self, s):
+        pass
+
+
+    def calculate(self, state):
+        pass
+
+
+    def calculate(self, state, setpoint):
+        pass
 
 
 class Thrusters:
@@ -184,6 +248,8 @@ class Thrusters:
 
     def __init__(self):
         self.__pca = PCA9685(0x40, 100, measured_frequency_hz=100)
+        # self.desired_twist = 
+        self.rotation_quat = []
         
 
     @property
@@ -191,9 +257,64 @@ class Thrusters:
         return self.__pca
     
 
-    def set_thrust(self, x, y, z, yaw, pitch, roll):
+    def set_rotation(self, r):
+        self.rotation_quat = r
+    
+
+    def set_thrust(self, x, y, z, yaw, pitch, roll, depth_lock=False):
+        if depth_lock:
+            current_rotation = Rotation.from_quat('zyx', self.rotation_quat, degrees=True)
+            desired_direction = np.array([x, y, 0])
+            rov_direction = current_rotation.apply(desired_direction)
+            x = rov_direction[0]
+            y = rov_direction[1]
+            z = rov_direction[2]
+
+
         thruster_outputs = get_thruster_outputs(x, y, z, yaw, pitch, roll)
         pca_outputs = thrusts_to_us(thruster_outputs)
         # To automatically set stuff, make a dict of the ids then sort based off of slot number, then write adjacent stuff together
         self.__pca.set_us(Thrusters.__FLH_ID, pca_outputs)
+
+        # [Front_left, Front_Right, Back_Left]
+        out = [1100, 1200, 1400]
+        self.__pca.set_us(3, out)
+
+        # Slot 3 = 1100
+        # Slot 4 = 1200
+        # Slot 5 = 1400
+
         return thruster_outputs
+
+
+    def set_thrust(self, thrust_twist: Twist, depth_lock=False):
+        return self.set_thrust(thrust_twist.linear.x, thrust_twist.linear.y, thrust_twist.linear.z,
+                                thrust_twist.angular.z, thrust_twist.angular.y, thrust_twist.angular.x,
+                                depth_lock=depth_lock)
+
+
+    def update():
+        pass
+
+
+    def update(quat):
+        pass
+
+
+
+if __name__ == '__main__':
+    # yaw pitch roll
+    r = [0, 
+         45 * math.pi / 180., 
+         45 * math.pi / 180.]
+    current_rotation = Rotation.from_euler('zyx', r)
+    print('ROV rotation: (%.03f, %.03f, %.03f)' % (r[0], r[1], r[2]))
+
+    # x y z velocities
+    des = [0, 1, 0]
+    desired_global_direction = np.array([des[0], des[1], des[2]])
+    print('Desired Global: (%.03f, %.03f, %.03f)' % (desired_global_direction[0], desired_global_direction[1], desired_global_direction[2]))
+
+    rov_relative_direction = current_rotation.apply(desired_global_direction)
+    print('ROV net thrust:(%.03f, %.03f, %.03f)' % (rov_relative_direction[0], rov_relative_direction[1], rov_relative_direction[2]))
+
