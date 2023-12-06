@@ -57,7 +57,7 @@ def bno_main():
     euler_publisher = rospy.Publisher('bno/euler', Vector3, queue_size=3)
 
     time.sleep(0.5)
-    rospy.Rate(10)
+    rate = rospy.Rate(10)
     print('Looping now')
     while not rospy.is_shutdown():
         quat = bno.game_quaternion
@@ -71,6 +71,8 @@ def bno_main():
         euler_publisher.publish(euler_ros)
 
         print(f'euler: {euler}\nquat: {quat}')
+        
+        rate.sleep()
 
     rospy.spin()
 

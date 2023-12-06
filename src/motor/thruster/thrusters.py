@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
 import math
-from geometry_msgs.msg import Vector3, Twist
+from geometry_msgs.msg import Vector3, Twist, Quaternion
 
 from pca import PCA9685
 
@@ -122,6 +122,7 @@ def pwm_to_thrust(pwm_on, voltage, use_t100=True):
         t_right = t100_left
 
     y = t_left(pwm_on)
+    
     right_x = quadratic_solve(y, t_right.coeffs[0], t_right.coeffs[1], t_right.coeffs[2])[0 if reversed_pwm else 1]
 
     return (pwm_on, y), (right_x, y)
@@ -162,10 +163,10 @@ def get_thruster_outputs(x, y, z, yaw, pitch, roll, max_thrust=MAX_THRUST_KGF) -
     return outputs
 
 
-def get_thruster_outputs(net_thrust_xyz_ypr, max_thrust=MAX_THRUST_KGF):
-    return get_thruster_outputs(net_thrust_xyz_ypr[0], net_thrust_xyz_ypr[1], net_thrust_xyz_ypr[2],
-                                net_thrust_xyz_ypr[3],net_thrust_xyz_ypr[4],net_thrust_xyz_ypr[5],
-                                max_thrust=max_thrust)
+# def get_thruster_outputs(net_thrust_xyz_ypr, max_thrust=MAX_THRUST_KGF):
+#     return get_thruster_outputs(net_thrust_xyz_ypr[0], net_thrust_xyz_ypr[1], net_thrust_xyz_ypr[2],
+#                                 net_thrust_xyz_ypr[3],net_thrust_xyz_ypr[4],net_thrust_xyz_ypr[5],
+#                                 max_thrust=max_thrust)
 
 
 def thrusts_to_us(thrusts: list):
@@ -173,10 +174,11 @@ def thrusts_to_us(thrusts: list):
     for i in range(len(thrusts)):
         reverse_thrust = thrusts[i] < 0
         if thrusts[i] > 0:
-            pwm_us = quadratic_solve(thrusts[i], t100_right.c[0], t100_right.c[1], t100_right.c[2])[0 if reverse_thrust else 1]
+            micros[i] = quadratic_solve(thrusts[i], t100_right.c[0], t100_right.c[1], t100_right.c[2])[1 if reverse_thrust else 0]
+        elif thrusts[i] < 0:
+            micros[i] = quadratic_solve(-thrusts[i], t100_left.c[0], t100_left.c[1], t100_left.c[2])[1 if reverse_thrust else 0]
         else:
-            pwm_us = quadratic_solve(thrusts[i], t100_left.c[0], t100_left.c[1], t100_left.c[2])[0 if reverse_thrust else 1]
-        micros[i] = pwm_us
+            micros[i] = 1500
     
     return micros
 
@@ -217,7 +219,7 @@ roll_pid = [0, 0, 0]
 
 class PIDController:
     # TODO: EWMA some inputs?
-    def __init__(self, p=0, i=0, d=0, f=0, i_zone=0, output_limit=0, ):
+    def __init__(self, p=0, i=0, d=0, f=0, i_zone=0, output_limit=0):
         pass
 
     
@@ -248,8 +250,8 @@ class Thrusters:
 
     def __init__(self):
         self.__pca = PCA9685(0x40, 100, measured_frequency_hz=100)
-        # self.desired_twist = 
-        self.rotation_quat = []
+        self.desired_twist = Twist()
+        self.rotation_quat = Quaternion()
         
 
     @property
@@ -257,49 +259,44 @@ class Thrusters:
         return self.__pca
     
 
-    def set_rotation(self, r):
+    def set_rotation(self, r: Quaternion):
         self.rotation_quat = r
     
 
     def set_thrust(self, x, y, z, yaw, pitch, roll, depth_lock=False):
         if depth_lock:
-            current_rotation = Rotation.from_quat('zyx', self.rotation_quat, degrees=True)
+            q = [self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w]
+
+            try:
+                current_rotation = Rotation.from_quat(q)
+            except ValueError:
+                print('depth_lock not applied (invalid quat)')
+                self.desired_twist = Twist(Vector3(x, y, z), Vector3(roll, pitch, yaw))
+                return
+
             desired_direction = np.array([x, y, 0])
             rov_direction = current_rotation.apply(desired_direction)
             x = rov_direction[0]
             y = rov_direction[1]
             z = rov_direction[2]
 
+        self.desired_twist = Twist(Vector3(x, y, z), Vector3(roll, pitch, yaw))
 
-        thruster_outputs = get_thruster_outputs(x, y, z, yaw, pitch, roll)
+
+    # def set_thrust(self, t: Twist, depth_lock=False):
+    #     self.set_thrust(t.linear.x, t.linear.y, t.linear.z, t.angular.z, t.angular.y, t.angular.x, depth_lock=depth_lock)
+
+
+    def update(self):
+        d = self.desired_twist
+        thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.z, d.angular.y, d.angular.x)
+        print('Thruster outputs: flh: %0.02f frh: %0.02f blh: %0.02f brh: %0.02f flv: %0.02f frv: %0.02f blv: %0.02f brv: %0.02f' % 
+        (thruster_outputs[0], thruster_outputs[1], thruster_outputs[2], thruster_outputs[3],
+        thruster_outputs[4], thruster_outputs[5], thruster_outputs[6], thruster_outputs[7]))
         pca_outputs = thrusts_to_us(thruster_outputs)
+        # print(f'PCA outputs: {pca_outputs}')
         # To automatically set stuff, make a dict of the ids then sort based off of slot number, then write adjacent stuff together
         self.__pca.set_us(Thrusters.__FLH_ID, pca_outputs)
-
-        # [Front_left, Front_Right, Back_Left]
-        out = [1100, 1200, 1400]
-        self.__pca.set_us(3, out)
-
-        # Slot 3 = 1100
-        # Slot 4 = 1200
-        # Slot 5 = 1400
-
-        return thruster_outputs
-
-
-    def set_thrust(self, thrust_twist: Twist, depth_lock=False):
-        return self.set_thrust(thrust_twist.linear.x, thrust_twist.linear.y, thrust_twist.linear.z,
-                                thrust_twist.angular.z, thrust_twist.angular.y, thrust_twist.angular.x,
-                                depth_lock=depth_lock)
-
-
-    def update():
-        pass
-
-
-    def update(quat):
-        pass
-
 
 
 if __name__ == '__main__':

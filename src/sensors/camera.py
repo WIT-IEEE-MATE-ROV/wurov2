@@ -3,7 +3,7 @@ import cv2 as cv
 import os
 import rospy
 from rospy.numpy_msg import numpy_msg
-from rospy_tutorials.msg import Floats
+from rospy_tutorials.msg import Image
 
 """
 
