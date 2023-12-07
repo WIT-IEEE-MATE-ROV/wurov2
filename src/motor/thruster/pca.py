@@ -278,13 +278,13 @@ class PCA9685:
             ctrl_data[ctrl_reg + 2] = off_counts & 0xFF
             ctrl_data[ctrl_reg + 3] = (off_counts >> 8) & 0x0F
 
-        print(ctrl_data)
+        # print(ctrl_data)
 
         start_reg = control_num * 4 + 6
         end_reg = end_ctrl * 4 + 6
 
         reg_length = end_reg - start_reg
-        print('reg_length: ', reg_length)
+        # print('reg_length: ', reg_length)
 
         if end_reg > 69:
             raise OverflowError("[ERROR] PCA9685 only has 16 control slots")
@@ -323,7 +323,7 @@ class PCA9685:
         end_reg = end_ctrl * 4 + 6
 
         reg_length = end_reg - start_reg
-        print('reg_length: ', reg_length)
+        # print('reg_length: ', reg_length)
 
         if end_reg > 69:
             raise OverflowError("[ERROR] PCA9685 only has 16 control slots")

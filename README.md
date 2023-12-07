@@ -13,4 +13,4 @@ This repository uses the de-facto directory standard found in ROS workspaces.
 
 
 Install: sudo apt-get install ros-noetic-joy  
-Install imu madgwick filter from https://github.com/CCNYRoboticsLab/imu_tools
+Install: imu madgwick filter from https://github.com/CCNYRoboticsLab/imu_tools
