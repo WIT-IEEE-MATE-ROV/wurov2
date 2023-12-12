@@ -2,8 +2,9 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import math
 from geometry_msgs.msg import Vector3, Twist, Quaternion
-
 from pca import PCA9685
+from queue import Queue
+import time
 
 # 1: Front Left
 # 2: Front Right
@@ -143,13 +144,6 @@ def get_vert_thruster_outputs(z_force, pitch, roll):
     return vertical_factor @ forces
 
 
-def get_vert_thruster_outputs_simple(upward_force, pitch, roll):
-    return np.array([upward_force + pitch - roll,
-                     upward_force + pitch + roll,
-                     upward_force - pitch - roll,
-                     upward_force - pitch + roll])
-
-
 def get_horizontal_thruster_outputs(x, y, yaw):
     net_thrust_desired = np.array([x, y, yaw])
     return horizontal_factor @ net_thrust_desired
@@ -183,7 +177,7 @@ def thrusts_to_us(thrusts: list):
     return micros
 
 
-def rotate_2d(x,y, angle_rad):
+def rotate_2d(x, y, angle_rad):
     x_p = x * np.cos(angle_rad) - y * np.sin(angle_rad)
     y_p = x * np.sin(angle_rad) + y * np.cos(angle_rad)
     return x_p , y_p
@@ -212,27 +206,69 @@ def euler_from_quaternion(x, y, z, w):
     return roll_x, pitch_y, yaw_z # in radians
 
 
-yaw_pid = [0, 0, 0]
-pitch_pid = [0, 0, 0]
-roll_pid = [0, 0, 0]
-
-
 class PIDController:
     # TODO: EWMA some inputs?
-    def __init__(self, p=0, i=0, d=0, f=0, i_zone=0, output_limit=0):
-        pass
+    # TODO: Derivative filter
+    def __init__(self, p=0, i=0, d=0, f=0, i_zone=None, max_i_accum=None, max_output=None):
+        self.kP = p
+        self.kI = i
+        self.kD = d
+        self.kF = f
+
+        self.previous_error = 0
+        self.previous_time = time.time()
+
+        self.i_accum = 0
+        self.setpoint = 0
+        self.max_output = max_output
+
+        self.i_zone = i_zone
+        self.max_i_accum = max_i_accum
+        self.max_output = max_output
 
     
     def set_setpoint(self, s):
-        pass
+        self.setpoint = s
+        self.i_accum = 0
 
 
     def calculate(self, state):
-        pass
+        current_time = time.time()
+        dt = current_time - self.previous_time
+        self.previous_time = current_time
 
+        error = self.setpoint - state
+        de = error - self.previous_error
 
-    def calculate(self, state, setpoint):
-        pass
+        # Clegg Integrator: Reset I term when error crosses 0
+        if self.kF == 0 and np.sign(self.previous_error) != np.sign(error):
+            self.i_accum = 0
+
+        # Apply integration zone. 
+        if self.i_zone is not None:
+            if abs(error) < self.i_zone:
+                self.i_accum += error * dt
+            else:
+                self.i_accum = 0
+        else:
+            self.i_accum += error * dt
+
+        # Hard limit integral windup
+        if self.max_i_accum is not None:
+            self.i_accum = min(self.i_accum, self.max_i_accum)
+        
+        # Calculate PIDF terms
+        p_out = self.kP * error
+        i_out = self.kI * self.i_accum
+        d_out = self.kD * (de / dt)
+        f_out = self.kF * self.setpoint
+        pid_output = p_out + i_out + d_out + f_out
+
+        # Hard limit output
+        if self.max_output is not None:
+            pid_output = min(pid_output, self.max_output)
+        
+        return pid_output
 
 
 class Thrusters:
@@ -268,13 +304,17 @@ class Thrusters:
             q = [self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w]
 
             try:
+                # Turn current rotation quat into scipy rotation
                 current_rotation = Rotation.from_quat(q)
             except ValueError:
                 print('depth_lock not applied (invalid quat)')
                 self.desired_twist = Twist(Vector3(x, y, z), Vector3(roll, pitch, yaw))
                 return
 
+            # Keep only x and y components of the direction
             desired_direction = np.array([x, y, 0])
+
+            # Rotate current rotation to the desired direction
             rov_direction = current_rotation.apply(desired_direction)
             x = rov_direction[0]
             y = rov_direction[1]
