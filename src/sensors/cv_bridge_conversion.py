@@ -21,7 +21,7 @@ class image_converter:
 
   def callback(self,data):
     try:
-      cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+      cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8") # converts to numpy.ndarray
     except CvBridgeError as e:
       print(e)
 
