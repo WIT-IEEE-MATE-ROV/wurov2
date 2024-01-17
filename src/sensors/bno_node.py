@@ -61,7 +61,7 @@ def bno_main():
         quat_publisher.publish(quat_ros)
         euler_publisher.publish(euler_ros)
 
-        print(f'euler: {euler}\nquat: {quat}')
+#        print(f'euler: {euler}\nquat: {quat}')
         
         rate.sleep()
 
