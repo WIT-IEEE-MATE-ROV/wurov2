@@ -293,9 +293,9 @@ class Thrusters:
         self.previous_pitch = 0
         self.previous_yaw = 0
 
-        self.roll_controller = PIDController(p=0.01111, i=0, d=0)
-        self.pitch_controller = PIDController(p=0.01111)
-        self.yaw_controller = PIDController(p=0.011111)
+        self.roll_controller = PIDController(p=0.1111, i=0, d=0)
+        self.pitch_controller = PIDController(p=0.1111)
+        self.yaw_controller = PIDController(p=0.11111)
         
 
     @property
@@ -338,11 +338,12 @@ class Thrusters:
     def update(self):
         d = self.desired_twist
 
-        rot_euler = euler_from_quaternion(self.rotation_quat)
+        rot_euler = euler_from_quaternion(self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w)
 
         if self.desired_twist.angular.x < 0.01:
             self.roll_controller.set_setpoint(self.previous_roll)
             d.angular.x = self.roll_controller.calculate(rot_euler[0])
+            print(f'Correcting roll current:{rot_euler[0]} desired:{self.previous_roll} output:{d.angular.x}')
         else:
             self.previous_roll = rot_euler[0]
         
@@ -355,7 +356,8 @@ class Thrusters:
         if self.desired_twist.angular.z < 0.01:
             self.yaw_controller.set_setpoint(self.previous_yaw)
             d.angular.z = self.yaw_controller.calculate(rot_euler[2])
-        else:self.previous_yaw = rot_euler[2]
+        else:
+            self.previous_yaw = rot_euler[2]
 
         thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.z, d.angular.y, d.angular.x)
         print('Thruster outputs: flh: %0.02f frh: %0.02f blh: %0.02f brh: %0.02f flv: %0.02f frv: %0.02f blv: %0.02f brv: %0.02f' % 
