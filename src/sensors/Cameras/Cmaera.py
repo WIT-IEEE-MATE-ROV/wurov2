@@ -164,14 +164,8 @@ if __name__ == "__main__":
     ct.start()
   
     try:
-        count = 0
         while True:
             _, frame = ct.read()
-            count += 1 
-            if (count % 20 == 0): # every 20 frames read text
-                frame_buff.put(frame)
-                
-                box_frame = ocr.detect_symbols()
             ct.view(frame)
             #ct.view(box_frame)
     except KeyboardInterrupt:
