@@ -288,6 +288,14 @@ class Thrusters:
         self.__pca = PCA9685(0x40, 100, measured_frequency_hz=100)
         self.desired_twist = Twist()
         self.rotation_quat = Quaternion()
+
+        self.previous_roll = 0
+        self.previous_pitch = 0
+        self.previous_yaw = 0
+
+        self.roll_controller = PIDController(p=0.01111, i=0, d=0)
+        self.pitch_controller = PIDController(p=0.01111)
+        self.yaw_controller = PIDController(p=0.011111)
         
 
     @property
@@ -329,11 +337,33 @@ class Thrusters:
 
     def update(self):
         d = self.desired_twist
+
+        rot_euler = euler_from_quaternion(self.rotation_quat)
+
+        if self.desired_twist.angular.x < 0.01:
+            self.roll_controller.set_setpoint(self.previous_roll)
+            d.angular.x = self.roll_controller.calculate(rot_euler[0])
+        else:
+            self.previous_roll = rot_euler[0]
+        
+        if self.desired_twist.angular.y < 0.01:
+            self.pitch_controller.set_setpoint(self.previous_pitch)
+            d.angular.y = self.pitch_controller.calculate(rot_euler[1])
+        else:
+            self.previous_pitch = rot_euler[1]
+
+        if self.desired_twist.angular.z < 0.01:
+            self.yaw_controller.set_setpoint(self.previous_yaw)
+            d.angular.z = self.yaw_controller.calculate(rot_euler[2])
+        else:self.previous_yaw = rot_euler[2]
+
         thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.z, d.angular.y, d.angular.x)
         print('Thruster outputs: flh: %0.02f frh: %0.02f blh: %0.02f brh: %0.02f flv: %0.02f frv: %0.02f blv: %0.02f brv: %0.02f' % 
         (thruster_outputs[0], thruster_outputs[1], thruster_outputs[2], thruster_outputs[3],
         thruster_outputs[4], thruster_outputs[5], thruster_outputs[6], thruster_outputs[7]))
         pca_outputs = thrusts_to_us(thruster_outputs)
+
+            
         # print(f'PCA outputs: {pca_outputs}')
         # To automatically set stuff, make a dict of the ids then sort based off of slot number, then write adjacent stuff together
         self.__pca.set_us(Thrusters.__FLH_ID, pca_outputs)

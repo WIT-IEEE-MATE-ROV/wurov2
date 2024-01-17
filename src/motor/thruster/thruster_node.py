@@ -68,3 +68,4 @@ def thruster_pub():
 
 if __name__ == '__main__':
     thruster_pub()
+    
