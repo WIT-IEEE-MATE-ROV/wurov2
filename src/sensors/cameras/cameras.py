@@ -1,4 +1,4 @@
-import sys, glob, os
+import sys, glob, os, time
 import threading
 from threading import Thread
 from multiprocessing import Queue, Process
@@ -6,6 +6,8 @@ from typing import List
 
 import cv2
 import numpy.typing as npt
+from typing import Tuple
+
 
 
 class Camera:
@@ -94,7 +96,7 @@ class Camera:
                 self.grabbed = grabbed
                 self.frames = frames
 
-    def read(self) -> bool | npt.NDArray:
+    def read(self) -> Tuple[bool, npt.NDArray]:
         """
         Reads the most recently captured frame from the camera.
 
@@ -138,6 +140,16 @@ class Camera:
             print("exit")
             self.stop()
 
+
+    def save_frame(self, path: str):
+        """
+        When function is called current frame is witten to given path
+        """
+        if self.is_running:
+            _, current_frame = self.read()
+            cv2.imwrite(path, current_frame)
+    
+
     @staticmethod
     def list_devices() -> List[str]:
         """
@@ -157,6 +169,7 @@ class Camera:
         return devices
 
 
+
 if __name__ == "__main__":
     frame_buff = Queue(maxsize=512)
     print(Camera.list_devices())
@@ -164,9 +177,14 @@ if __name__ == "__main__":
     ct.start()
   
     try:
+        count = 0
         while True:
             _, frame = ct.read()
-            ct.view(frame)
+            time.sleep(0.5)
+            ct.save_frame(f"./frame_{count}.png")
+            count += 1 
+            if count > 10:
+                sys.exit()
             #ct.view(box_frame)
     except KeyboardInterrupt:
         print("stop")
