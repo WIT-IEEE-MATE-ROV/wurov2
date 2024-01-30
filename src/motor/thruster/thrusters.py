@@ -149,7 +149,7 @@ def get_horizontal_thruster_outputs(x, y, yaw):
     return horizontal_factor @ net_thrust_desired
 
 
-def get_thruster_outputs(x, y, z, yaw, pitch, roll, max_thrust=MAX_THRUST_KGF) -> np.array:
+def get_thruster_outputs(x, y, z, roll, pitch, yaw, max_thrust=MAX_THRUST_KGF) -> np.array:
     horizontal = get_horizontal_thruster_outputs(x, y, yaw)
     vertical = get_vert_thruster_outputs(z, pitch, roll)
     outputs = np.concatenate((horizontal, vertical))
@@ -296,6 +296,7 @@ class Thrusters:
         self.roll_controller = PIDController(p=0.1111, i=0, d=0)
         self.pitch_controller = PIDController(p=0.1111)
         self.yaw_controller = PIDController(p=0.11111)
+        self.depth_controller = PIDController(p=0, d=0)
         
 
     @property
@@ -303,11 +304,31 @@ class Thrusters:
         return self.__pca
     
 
-    def set_rotation(self, r: Quaternion):
+    def set_rotation(self, r: Quaternion) -> None:
+        """
+        Set the current ROV rotation
+
+        Args:
+            r (Quaternion): ROV rotation
+        """
         self.rotation_quat = r
     
 
-    def set_thrust(self, x, y, z, yaw, pitch, roll, depth_lock=False):
+    def set_thrust(self, x:float, y:float, z:float, roll:float, pitch:float, yaw:float, depth_lock:bool=False, depth_command:float=None) -> None:
+        """
+        Set the desired thrust vector
+
+        Args:
+            x (float): ROV-relative x thrust
+            y (float): ROV-relative y thrust
+            z (float): ROV-relative z thrust
+            roll (float): ROV-relative roll moment
+            pitch (float): ROV-relative pitch moment
+            yaw (float): ROV-relative yaw moment
+            depth_lock (bool, optional): Keep the ROV at a constant depth. Defaults to False.
+            depth_command (float, optional): Control the ROV depth thrust. Defaults to None.
+        """
+
         if depth_lock:
             q = [self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w]
 
@@ -335,7 +356,11 @@ class Thrusters:
     #     self.set_thrust(t.linear.x, t.linear.y, t.linear.z, t.angular.z, t.angular.y, t.angular.x, depth_lock=depth_lock)
 
 
-    def update(self):
+    def update(self) -> None:
+        """
+        Calculate PID outputs and set PCA PWM values
+        """
+
         d = self.desired_twist
 
         rot_euler = euler_from_quaternion(self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w)
@@ -343,7 +368,6 @@ class Thrusters:
         if self.desired_twist.angular.x < 0.01:
             self.roll_controller.set_setpoint(self.previous_roll)
             d.angular.x = self.roll_controller.calculate(rot_euler[0])
-            print(f'Correcting roll current:{rot_euler[0]} desired:{self.previous_roll} output:{d.angular.x}')
         else:
             self.previous_roll = rot_euler[0]
         
@@ -359,10 +383,12 @@ class Thrusters:
         else:
             self.previous_yaw = rot_euler[2]
 
-        thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.z, d.angular.y, d.angular.x)
-        print('Thruster outputs: flh: %0.02f frh: %0.02f blh: %0.02f brh: %0.02f flv: %0.02f frv: %0.02f blv: %0.02f brv: %0.02f' % 
+        thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
+
+        print('Thruster outputs: FLH: %0.02f FRH: %0.02f BLH: %0.02f BRH: %0.02f FLV: %0.02f FRV: %0.02f BLV: %0.02f BRV: %0.02f' % 
         (thruster_outputs[0], thruster_outputs[1], thruster_outputs[2], thruster_outputs[3],
         thruster_outputs[4], thruster_outputs[5], thruster_outputs[6], thruster_outputs[7]))
+
         pca_outputs = thrusts_to_us(thruster_outputs)
 
             

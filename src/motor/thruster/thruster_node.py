@@ -57,11 +57,11 @@ def thruster_pub():
 
     while not rospy.is_shutdown():
         thrusters.set_thrust(desired_twist.linear.x, desired_twist.linear.y, desired_twist.linear.z,
-                            desired_twist.angular.z, desired_twist.angular.y, desired_twist.angular.x,
+                            desired_twist.angular.x, desired_twist.angular.y, desired_twist.angular.z,
                             depth_lock=True)
 
         thrusters.update()
-        rate.sleep()
+        # rate.sleep()
     
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
