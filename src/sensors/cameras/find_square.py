@@ -3,7 +3,7 @@ import math
 import cv2
 import numpy as np
 from scipy import ndimage
-from camera import Camera
+from cameras import Camera
 
 
 dim = (640, 480)
@@ -13,7 +13,7 @@ def detect_red_square(frame):
 
     # Read the image    
     # img = ndimage.rotate(img, 45)
-    img_blur = cv2.GaussianBlur(frame, (9, 7), 0)
+    img_blur = cv2.GaussianBlur(frame, (9, 9), 0)
 
     # Convert the image from BGR to HSV
     img_hsv = cv2.cvtColor(img_blur, cv2.COLOR_BGR2HSV)
@@ -25,7 +25,8 @@ def detect_red_square(frame):
     # Define the lower and upper bounds for red color in HSV
     # lower_red = np.array([0, 197, 121])
     # upper_red = np.array([179, 255, 255])
-    lower_red, upper_red = (0, 109, 26), (7, 255, 255)
+    #(0, 109, 26), (7, 255, 255)
+    lower_red, upper_red = (131, 80, 95), (179, 237, 255)
 
     # Create a mask to extract only red pixels
     mask = cv2.inRange(img_hsv_blur, lower_red, upper_red)
@@ -73,7 +74,7 @@ def detect_red_square(frame):
             box = np.intp(bp)
             frame = cv2.drawContours(frame, [box], 0, (0, 0, 255), 2)
     
-    return mask
+    return frame
 
     # Display the result
     # cv2.imshow('Red Square Detection', cv2.resize(img, (1920,1080)))
