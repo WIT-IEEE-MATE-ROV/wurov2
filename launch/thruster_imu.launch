@@ -1,4 +1,4 @@
 <launch>
-    <node name="bno" pkg="wurov2_0" type="BNO_node.py"/>
+    <node name="bno" pkg="wurov2_0" type="bno_node.py"/>
     <node name="thrusters" pkg="wurov2_0" type="thruster_node.py"/>
 </launch>
