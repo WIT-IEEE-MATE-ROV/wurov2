@@ -412,4 +412,3 @@ if __name__ == '__main__':
 
     rov_relative_direction = current_rotation.apply(desired_global_direction)
     print('ROV net thrust:(%.03f, %.03f, %.03f)' % (rov_relative_direction[0], rov_relative_direction[1], rov_relative_direction[2]))
-
