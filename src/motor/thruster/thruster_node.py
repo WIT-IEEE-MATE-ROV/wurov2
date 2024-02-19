@@ -9,8 +9,10 @@ import time
 import numpy as np
 import math
 
+LOOP_PERIOD_MS = 20.
 desired_twist = Twist()
 current_rotation = Quaternion()
+
 
 def rotate_2d(x,y, angle_rad):
     x_p = x * np.cos(angle_rad) - y * np.sin(angle_rad)
@@ -37,20 +39,8 @@ def callback_navigation(data):
     # print(f'right_trigger: {data.axes[5]}')
     
     
-def callback_angle(data):
-    # Does this once Imu data comes in
-    # desired_twist.angular.x = data.x # Roll degress
-    # desired_twist.angular.y = data.y # pitch degress
-    # desired_twist.angular.z = data.z # yaw degress
-    pass
-
-
-def callback_euler(data, thrusters):
-    # print(f'thruster_node recieved: {data}')
-    pass
-
 def callback_quat(data, thrusters):
-    # print(f'Thruster quat recieved: {data}')
+    # print(f'thruster_node quat recieved: {data}')
     thrusters.set_rotation(data)
 
     
@@ -60,25 +50,22 @@ def thruster_pub():
 
     print(f'Thrusters started')
 
-    # Initilizes a default ros node 
     rospy.init_node('thrusters', anonymous=True)
-    sub = rospy.Subscriber("joy", Joy, callback_navigation) # Gets data from joy msg in float32 array for axes and int32 array for buttons
-    # sub2 = rospy.Subscriber("orientation", Vector3, callback_angle) # Has data.x as roll = x, pitch = y, yaw = z in degrees
-    euler_sub = rospy.Subscriber("bno/euler", Vector3, callback_euler, callback_args=(thrusters))
+    joy_sub = rospy.Subscriber("joy", Joy, callback_navigation) # Gets data from joy msg in float32 array for axes and int32 array for buttons
     quat_sub = rospy.Subscriber("bno/quat", Quaternion, callback_quat, callback_args=(thrusters))
-    rate = rospy.Rate(10) # 10hz
+    rate = rospy.Rate(1 / (LOOP_PERIOD_MS / 1000))
 
     while not rospy.is_shutdown():
         thrusters.set_thrust(desired_twist.linear.x, desired_twist.linear.y, desired_twist.linear.z,
-                            desired_twist.angular.z, desired_twist.angular.y, desired_twist.angular.x,
+                            desired_twist.angular.x, desired_twist.angular.y, desired_twist.angular.z,
                             depth_lock=True)
 
         thrusters.update()
-        # print(f'thruster_output: {thruster_output}\n')
-        rate.sleep()
+        # rate.sleep()
     
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
 
 if __name__ == '__main__':
     thruster_pub()
+    
