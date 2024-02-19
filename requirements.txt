@@ -16,3 +16,4 @@ rospy
 smbus-cffi
 rospy-message-converter
 bluerobotics-ping
+smbus2
