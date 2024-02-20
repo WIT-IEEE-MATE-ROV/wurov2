@@ -9,6 +9,7 @@ adafruit-circuitpython-motor
 adafruit-circuitpython-pca9685
 adafruit-circuitpython-register
 adafruit-circuitpython-servokit
+adafruit-circuitpython-ads1x15
 adafruit-blinka
 opencv-python
 numpy
