@@ -4,6 +4,7 @@ import math
 from geometry_msgs.msg import Vector3, Twist, Quaternion
 from pca import PCA9685
 from queue import Queue
+import quaternion
 import time
 
 # 1: Front Left
@@ -271,6 +272,36 @@ class PIDController:
         return pid_output
 
 
+class QuatPIDController:
+
+        def __init__(self, p=0, i=0, d=0):
+            self.kp = p
+            self.ki = i
+            self.kd = d
+            self.setpoint = None
+            self.previous_time = time.time()
+
+        
+        def set_setpoint(self, q):
+            self.setpoint = q
+
+
+        def calculate(self, q):
+            error = q.inverse() - self.setpoint
+
+            if error.w < 0:
+                error = -error
+
+            dt = time.time() - self.previous_time
+            
+            outputs = [0] * 3
+            outputs[0] = error.x * self.kp
+            outputs[1] = error.y * self.kp
+            outputs[2] = error.z * self.kp
+
+            return outputs
+
+        
 class Thrusters:
     # Horizontal thruster PCA slots
     __FLH_ID = 0
@@ -296,6 +327,7 @@ class Thrusters:
         self.roll_controller = PIDController(p=0.1111, i=0, d=0)
         self.pitch_controller = PIDController(p=0.1111)
         self.yaw_controller = PIDController(p=0.11111)
+        self.quat_controller = QuatPIDController(p=0.7)
         self.depth_controller = PIDController(p=0, d=0)
         
 
@@ -364,24 +396,31 @@ class Thrusters:
         d = self.desired_twist
 
         rot_euler = euler_from_quaternion(self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w)
+        q = np.quaternion(self.rotation_quat.w, self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z)
+        self.quat_controller.set_setpoint(np.quaternion(1, 0, 0, 0))
+        qc_output = self.quat_controller.calculate(q)
+        d.angular.x = qc_output[0]
+        d.angular.y = qc_output[1]
+        d.angular.z = qc_output[2]
 
-        if self.desired_twist.angular.x < 0.01:
-            self.roll_controller.set_setpoint(self.previous_roll)
-            d.angular.x = self.roll_controller.calculate(rot_euler[0])
-        else:
-            self.previous_roll = rot_euler[0]
+
+        # if self.desired_twist.angular.x < 0.01:
+        #     self.roll_controller.set_setpoint(self.previous_roll)
+        #     d.angular.x = self.roll_controller.calculate(rot_euler[0])
+        # else:
+        #     self.previous_roll = rot_euler[0]
         
-        if self.desired_twist.angular.y < 0.01:
-            self.pitch_controller.set_setpoint(self.previous_pitch)
-            d.angular.y = self.pitch_controller.calculate(rot_euler[1])
-        else:
-            self.previous_pitch = rot_euler[1]
+        # if self.desired_twist.angular.y < 0.01:
+        #     self.pitch_controller.set_setpoint(self.previous_pitch)
+        #     d.angular.y = self.pitch_controller.calculate(rot_euler[1])
+        # else:
+        #     self.previous_pitch = rot_euler[1]
 
-        if self.desired_twist.angular.z < 0.01:
-            self.yaw_controller.set_setpoint(self.previous_yaw)
-            d.angular.z = self.yaw_controller.calculate(rot_euler[2])
-        else:
-            self.previous_yaw = rot_euler[2]
+        # if self.desired_twist.angular.z < 0.01:
+        #     self.yaw_controller.set_setpoint(self.previous_yaw)
+        #     d.angular.z = self.yaw_controller.calculate(rot_euler[2])
+        # else:
+        #     self.previous_yaw = rot_euler[2]
 
         thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
 
