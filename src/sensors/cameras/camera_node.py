@@ -5,15 +5,17 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 
+
+
 class CameraNode:
     def __init__(self):
         rospy.init_node('camera_node', anonymous=True)
         self.image_pub = rospy.Publisher('camera/image', Image, queue_size=10)
-        self.cap = cv2.VideoCapture(0)  # Assuming the camera is at index 0
+        self.cap = cv2.VideoCapture(1)  # Assuming the camera is at index 0
         self.bridge = CvBridge()
 
     def capture_and_publish(self):
-        rate = rospy.Rate(10)  # Adjust the rate based on your requirement
+        rate = rospy.Rate(100)  # Adjust the rate based on your requirement
 
         while not rospy.is_shutdown():
             ret, frame = self.cap.read()

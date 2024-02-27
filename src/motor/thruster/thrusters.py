@@ -280,6 +280,9 @@ class QuatPIDController:
             self.kd = d
             self.setpoint = None
             self.previous_time = time.time()
+            self.prev_x_e = 0
+            self.prev_y_e = 0
+            self.prev_z_e = 0
 
         
         def set_setpoint(self, q):
@@ -295,10 +298,13 @@ class QuatPIDController:
             dt = time.time() - self.previous_time
             
             outputs = [0] * 3
-            outputs[0] = error.x * self.kp
-            outputs[1] = error.y * self.kp
-            outputs[2] = error.z * self.kp
-
+            outputs[0] = error.x * self.kp + (error.x - self.prev_x_e / dt) * self.kd
+            outputs[1] = error.y * self.kp + (error.y - self.prev_y_e / dt) * self.kd
+            outputs[2] = error.z * self.kp + (error.z - self.prev_z_e / dt) * self.kd
+            self.prev_x_e = error.x
+            self.prev_y_e = error.y
+            self.prev_z_e = error.z
+            
             return outputs
 
         

@@ -92,7 +92,7 @@ def bno_main():
         euler_publisher.publish(euler_ros)
         pose_publisher.publish(tf_message)
 
-#        print(f'euler: {euler}\nquat: {quat}')
+        print(f'euler: {euler}\nquat: {quat}')
         
         sequence += 1
         rate.sleep()

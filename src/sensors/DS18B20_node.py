@@ -1,14 +1,14 @@
-#!/usr/bin/env python3
+# #!/usr/bin/env python3
 
-import board
-import Jetson.GPIO as GPIO
+# import rospy
+# import time
+# import board
+# import adafruit_ads1x15.ads1115 as ADS
+# from adafruit_ads1x15.analog_in import AnalogIn
+# from std_msgs import Float32
 
-DS18B20_PIN = 7  # the pin that the temp sensor is pluged into
-
-#BCM which refer to the pin number of the 40 pin GPIO header 
-GPIO.setmode(GPIO.BOARD)
-print(GPIO.getmode())
-GPIO.setup(board.D12, GPIO.IN)
+# # Setting up the ADS1115 module I2C busses
+# i2c = board.I2C()  # uses board.SCL and board.SDA
 
 
 
