@@ -1,19 +1,24 @@
+#!/usr/bin/env python3
+
 import math
 
 import cv2
 import numpy as np
 from scipy import ndimage
 from cameras import Camera
-
+import rospy
+from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image, CompressedImage
 
 dim = (640, 480)
 
+bridge = CvBridge()
 
 def detect_red_square(frame):
 
     # Read the image    
     # img = ndimage.rotate(img, 45)
-    img_blur = cv2.GaussianBlur(frame, (9, 9), 0)
+    img_blur = cv2.GaussianBlur(frame, (15, 15), 0)
 
     # Convert the image from BGR to HSV
     img_hsv = cv2.cvtColor(img_blur, cv2.COLOR_BGR2HSV)
@@ -26,7 +31,8 @@ def detect_red_square(frame):
     # lower_red = np.array([0, 197, 121])
     # upper_red = np.array([179, 255, 255])
     #(0, 109, 26), (7, 255, 255)
-    lower_red, upper_red = (131, 80, 95), (179, 237, 255)
+    # lower_red, upper_red = (131, 80, 95), (179, 237, 255)
+    lower_red, upper_red = (0, 63, 60), (23, 255, 189)
 
     # Create a mask to extract only red pixels
     mask = cv2.inRange(img_hsv_blur, lower_red, upper_red)
@@ -85,8 +91,39 @@ def detect_red_square(frame):
 
 
 # Example usage
-cam = Camera(1080, 720, "/dev/video0").start()
-while True:
-    _, f = cam.read()
-    frame = detect_red_square(f)
-    cam.view(frame)
+def image_callback(image_data: Image, result_publisher: rospy.Publisher):
+    rospy.loginfo("Detecting Square")
+    try:
+        cv2_img = bridge.imgmsg_to_cv2(image_data, "bgr8")
+    except CvBridgeError as e:
+        rospy.logerr("Conversion to CV image failed")
+        rospy.logerr(e)
+    else:
+        frame = detect_red_square(cv2_img)
+        msg = CompressedImage()
+        msg.header.stamp = rospy.Time.now()
+        msg.format = "jpeg"
+        msg.data = np.array(cv2.imencode('.jpg', frame)[1]).tostring()
+        result_publisher.publish(msg)
+
+
+
+def detect_pub():
+    # cam = Camera(1080, 720, "/dev/video0").start()
+    rospy.init_node('square_detect', anonymous=True)
+    detect_pub = rospy.Publisher('/square_detect/compressed', CompressedImage)
+    im_sub = rospy.Subscriber("/camera1/usb_cam1/image_raw", Image, image_callback, (detect_pub), queue_size=1)
+
+    rospy.spin()
+
+    # while not rospy.is_shutdown():
+    #     _, f = cam.read()
+        
+    #     frame = detect_red_square(f)
+    #     cam.view(frame)
+
+
+# TODO: Argument for camera selection
+if __name__ == '__main__':
+    detect_pub()
+

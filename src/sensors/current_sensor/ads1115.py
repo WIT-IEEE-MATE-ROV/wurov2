@@ -16,13 +16,13 @@ import time
 import board
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
-from std_msgs import Float32
+from std_msgs.msg import Float32
 
 # Setting up the ADS1115 module I2C busses
 i2c = board.I2C()  # uses board.SCL and board.SDA
 
 ads = ADS.ADS1115(i2c)
-ads.mode = Mode.SINGLE # allows for multiple channels, it tells sensor to wait for ADS to complete conversion
+# ads.mode = Mode.SINGLE # allows for multiple channels, it tells sensor to wait for ADS to complete conversion
 
 # Channels where data is saved from pins
 chan_5V = AnalogIn(ads, ADS.P0) # TODO: Temporary P0 for now change channel when we know 

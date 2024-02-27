@@ -5,9 +5,11 @@ import time
 import board
 import math
 import busio
-from geometry_msgs.msg import Vector3, Quaternion
+from geometry_msgs.msg import Vector3, Quaternion, Pose, Point, TransformStamped, Transform
+from std_msgs.msg import Header
 from adafruit_bno08x import BNO_REPORT_GAME_ROTATION_VECTOR
 from adafruit_bno08x.i2c import BNO08X_I2C
+from tf2_msgs.msg import TFMessage
 
 
 LOOP_PERIOD_MS = 20.
@@ -45,6 +47,20 @@ def bno_main():
     rospy.init_node('bno')
     quat_publisher = rospy.Publisher('bno/quat', Quaternion, queue_size=3)
     euler_publisher = rospy.Publisher('bno/euler', Vector3, queue_size=3)
+    pose_publisher = rospy.Publisher('bno/pose', TFMessage, queue_size=3)
+
+    sequence = 0
+    timestamp = rospy.Time().now()
+    frame_id = 'bno_pose'
+    header = Header(sequence, timestamp, frame_id)
+
+    translation = Vector3(0, 0, 0)
+    
+
+    current_transform = Transform(translation, Quaternion(0, 0, 0, 0))
+    current_transform_stamped = TransformStamped(header, 'poses', current_transform)
+
+    tf_message = TFMessage([current_transform_stamped])
 
     time.sleep(0.5)
 
@@ -58,11 +74,27 @@ def bno_main():
         euler = [c * 180/3.14159 for c in euler_from_quaternion(quat[0], quat[1], quat[2], quat[3])]
         euler_ros = Vector3(euler[0], euler[1], euler[2])
 
+        pose = Pose(Point(0,0,0), quat_ros)
+
+        current_transform = Transform(translation, quat_ros)
+
+        header.seq = sequence
+        header.stamp = rospy.Time().now()
+
+        # current_transform_stamped.header = header
+        # current_transform_stamped.transform = current_transform
+
+        tf_message.transforms[0].header = header
+        tf_message.transforms[0].transform = current_transform
+
+
         quat_publisher.publish(quat_ros)
         euler_publisher.publish(euler_ros)
+        pose_publisher.publish(tf_message)
 
-#        print(f'euler: {euler}\nquat: {quat}')
+        print(f'euler: {euler}\nquat: {quat}')
         
+        sequence += 1
         rate.sleep()
 
     rospy.spin()

@@ -1,7 +1,7 @@
 <launch>
 
  <!-- Run this command to find ports for video feeds ls /dev/ | grep video -->
- <group ns="camera1">
+ <!-- <group ns="camera1">
   <node name="usb_cam1" pkg="usb_cam" type="usb_cam_node" output="screen" >
     <param name="video_device" value="/dev/video1" />
     <param name="image_width" value="640" />
@@ -31,7 +31,7 @@
     <remap from="image" to="/usb_cam/image_raw"/>
     <param name="autosize" value="true" />
   </node>
- </group>
+ </group> -->
 
  <group ns="camera3">
   <node name="usb_cam3" pkg="usb_cam" type="usb_cam_node" output="screen" >
@@ -49,7 +49,7 @@
   </node>
  </group>
 
- <group ns="camera4">
+ <!-- <group ns="camera4">
   <node name="usb_cam4" pkg="usb_cam" type="usb_cam_node" output="screen" >
     <param name="video_device" value="/dev/video5" /> 
     <param name="image_width" value="640" />
@@ -63,6 +63,6 @@
     <remap from="image" to="/usb_cam/image_raw"/>
     <param name="autosize" value="true" />
   </node>
- </group> 
+ </group>  -->
 
 </launch>
