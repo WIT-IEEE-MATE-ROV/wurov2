@@ -5,12 +5,19 @@ import time
 import board
 import math
 import busio
-from geometry_msgs.msg import Vector3, Quaternion, Pose, Point, TransformStamped, Transform
-from std_msgs.msg import Header
-from adafruit_bno08x import BNO_REPORT_GAME_ROTATION_VECTOR
+from geometry_msgs.msg import Vector3, Quaternion
+# from adafruit_bno08x import BNO_REPORT_GAME_ROTATION_VECTOR
+from adafruit_bno08x import (
+    BNO_REPORT_GAME_ROTATION_VECTOR,
+    BNO_REPORT_ACCELEROMETER,
+    BNO_REPORT_GYROSCOPE,
+    BNO_REPORT_MAGNETOMETER,
+    BNO_REPORT_ROTATION_VECTOR,
+)
 from adafruit_bno08x.i2c import BNO08X_I2C
+from sensor_msgs.msg import Imu
+import adafruit_bno055
 from tf2_msgs.msg import TFMessage
-
 
 LOOP_PERIOD_MS = 20.
 
@@ -39,28 +46,21 @@ def euler_from_quaternion(x, y, z, w):
 
 
 def bno_main():
+    imu_data_seq_counter = 0
     print('bno_node: Initializing...')
     i2c = busio.I2C(board.SCL, board.SDA, frequency=100000)
     bno = BNO08X_I2C(i2c)
+    # bno = adafruit_bno055.BNO055_I2C(i2c, address=0x28)
     bno.enable_feature(BNO_REPORT_GAME_ROTATION_VECTOR)
+    bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+    bno.enable_feature(BNO_REPORT_GYROSCOPE)
+    bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+    bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
 
     rospy.init_node('bno')
+    pub_imu_data = rospy.Publisher('imu/data', Imu, queue_size=5)
     quat_publisher = rospy.Publisher('bno/quat', Quaternion, queue_size=3)
     euler_publisher = rospy.Publisher('bno/euler', Vector3, queue_size=3)
-    pose_publisher = rospy.Publisher('bno/pose', TFMessage, queue_size=3)
-
-    sequence = 0
-    timestamp = rospy.Time().now()
-    frame_id = 'bno_pose'
-    header = Header(sequence, timestamp, frame_id)
-
-    translation = Vector3(0, 0, 0)
-    
-
-    current_transform = Transform(translation, Quaternion(0, 0, 0, 0))
-    current_transform_stamped = TransformStamped(header, 'poses', current_transform)
-
-    tf_message = TFMessage([current_transform_stamped])
 
     time.sleep(0.5)
 
@@ -68,33 +68,46 @@ def bno_main():
 
     print('bno_node: Publishing')
     while not rospy.is_shutdown():
-        quat = bno.game_quaternion
-        quat_ros = Quaternion(quat[0], quat[1], quat[2], quat[3])
+        # quat = bno.game_quaternion         
+        imu_data = Imu()  
+        
+        quat = bno.quaternion
+        linear_acceleration = bno.acceleration
+        gyroscope = bno.gyro
+        
+        imu_data.header.stamp = rospy.Time.now()
+        imu_data.header.frame_id = None
+        imu_data.header.seq = imu_data_seq_counter
 
+        imu_data.orientation.w = quat[0]
+        imu_data.orientation.x = quat[1]
+        imu_data.orientation.y = quat[2]
+        imu_data.orientation.z = quat[3]
+
+        imu_data.linear_acceleration.x = linear_acceleration[0]
+        imu_data.linear_acceleration.y = linear_acceleration[1]
+        imu_data.linear_acceleration.z = linear_acceleration[2]
+
+        imu_data.angular_velocity.x = gyroscope[0]
+        imu_data.angular_velocity.y = gyroscope[1]
+        imu_data.angular_velocity.z = gyroscope[2]
+
+        imu_data.orientation_covariance[0] = -1
+        imu_data.linear_acceleration_covariance[0] = -1
+        imu_data.angular_velocity_covariance[0] = -1
+
+        imu_data_seq_counter=+1
+
+        quat_ros = Quaternion(quat[0], quat[1], quat[2], quat[3])
         euler = [c * 180/3.14159 for c in euler_from_quaternion(quat[0], quat[1], quat[2], quat[3])]
         euler_ros = Vector3(euler[0], euler[1], euler[2])
 
-        pose = Pose(Point(0,0,0), quat_ros)
-
-        current_transform = Transform(translation, quat_ros)
-
-        header.seq = sequence
-        header.stamp = rospy.Time().now()
-
-        # current_transform_stamped.header = header
-        # current_transform_stamped.transform = current_transform
-
-        tf_message.transforms[0].header = header
-        tf_message.transforms[0].transform = current_transform
-
-
+        pub_imu_data.publish(imu_data)
         quat_publisher.publish(quat_ros)
         euler_publisher.publish(euler_ros)
-        pose_publisher.publish(tf_message)
 
-        print(f'euler: {euler}\nquat: {quat}')
+#        print(f'euler: {euler}\nquat: {quat}')
         
-        sequence += 1
         rate.sleep()
 
     rospy.spin()

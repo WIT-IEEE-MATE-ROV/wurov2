@@ -336,14 +336,83 @@ class PCA9685:
 
 
 if __name__ == '__main__':
-    p = PCA9685(0x42, 100, 103.7)
+    # GRIPPER TEST
+    # p = PCA9685(0x41, 100)
+    # p.software_reset()
+    # p.setup()
+    # p.set_sleep(False)
+    # try:
+    #     while True:
+    #         p.set_us(10, [1800])
+    #         time.sleep(3)
+    #         p.set_us(10, [1200])
+    #         time.sleep(2)
+    #         # p.set_us(10, [1500])
+    #         # time.sleep(2)
+    # finally:
+    #     p.close()
+
+    # exit()
+
+    # LIGHT TEST
+    p = PCA9685(0x41, 100)
     p.software_reset()
     p.setup()
     p.set_sleep(False)
+    # try:
+    #     while True:
+    #         p.set_us(8, [1900])
+    #         time.sleep(0.5)
+    #         p.set_us(8, [1100])
+    #         time.sleep(0.5)
+    # finally:
+    #     p.close()
 
-    p.set_duty_cycles(0, [1] * 10)
+    # exit()
 
-    print(p.get_counts(0))
+    # THRUSTER TEST
+    p1 = PCA9685(0x40, 100, 105.6)
+    p1.setup()
+    # p1.set_sleep(False)
+    # exit()
 
-    print(p.i2c_bus.read_i2c_block_data(0x40, 0x00, 4))
-    p.close()
+    try:
+        while True:
+            p.set_us(8, [1900])
+            time.sleep(0.5)
+            p.set_us(8, [1100])
+            time.sleep(0.5)
+            on_counts, off_counts = p1.get_counts(0)
+            print(f'Before on_counts = {on_counts}, off_counts = {off_counts}')
+            # p.set_duty_cycles(0, [0])
+            p1.set_us(3, [1500])
+            on_counts, off_counts = p1.get_counts(0)
+            print(f' After on_counts = {on_counts}, off_counts = {off_counts}')
+
+            time.sleep(1)
+
+            on_counts, off_counts = p1.get_counts(0)
+            print(f'Before on_counts = {on_counts}, off_counts = {off_counts}')
+            # p.set_duty_cycles(0, [0])
+            p1.set_us(3, [1600])
+            on_counts, off_counts = p1.get_counts(0)
+            print(f' After on_counts = {on_counts}, off_counts = {off_counts}')
+
+            time.sleep(1)
+
+    finally:
+        # p.set_us(4, [1500])
+        p.close()
+        p1.close()
+
+    # print(p.i2c_bus.read_i2c_block_data(0x40, 0x00, 4))
+    # Horizontal thruster PCA slots
+    # __FLH_ID = 0
+    # __FRH_ID = 5
+    # __BLH_ID = 1
+    # __BRH_ID = 6
+    # Vertical thruster PCA slots__FLH_ID
+    # __FLV_ID = 3
+    # __FRV_ID = 4
+    # __BLV_ID = 2
+    # __BRV_ID = 7
