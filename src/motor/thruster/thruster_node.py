@@ -23,9 +23,9 @@ def rotate_2d(x,y, angle_rad):
     y_p = x * np.sin(angle_rad) + y * np.cos(angle_rad)
     return x_p , y_p
 
-def deadband(input, min_value):
-    if abs(input) >= min_value:
-        return input
+def deadband(input, min_input):
+    if abs(input) >= min_input:
+        return (input - (abs(input) / input) * min_input) / (1 - min_input)
     else:
         return 0
 
