@@ -19,8 +19,8 @@ THRUSTER_ANGLE_DEG = 45
 # THRUSTER_ANGLE_DEG = math.acos(.875) * 180/np.pi # Sanity check angle
 thruster_angles = np.array(
     [THRUSTER_ANGLE_DEG, THRUSTER_ANGLE_DEG, THRUSTER_ANGLE_DEG, THRUSTER_ANGLE_DEG]) * np.pi / 180
-THRUSTER_LENGTH_DISTANCE_M = 1
-THRUSTER_WIDTH_DISTANCE_M = .5
+THRUSTER_LENGTH_DISTANCE_M = 0.5842
+THRUSTER_WIDTH_DISTANCE_M = 0.4826
 THRUSTER_DIAGONAL_DISTANCE_M = math.sqrt(THRUSTER_WIDTH_DISTANCE_M ** 2 + THRUSTER_LENGTH_DISTANCE_M ** 2)
 HALF_LENGTH = THRUSTER_LENGTH_DISTANCE_M / 2
 HALF_WIDTH = THRUSTER_WIDTH_DISTANCE_M / 2
@@ -72,20 +72,19 @@ horizontal_factor = h_V @ h_S_inv_0 @ h_U_T
 vertical_factor = v_V @ v_S_inv_0 @ v_U_T
 
 # Constants to use for feedforward control
-MAX_THRUST_KGF = 1.5
+MAX_THRUST_KGF = 1.768181818
 MAX_NET_X_KGF = MAX_THRUST_KGF * 4 * math.cos(thruster_angles[0])
 MAX_NET_Y_KGF = MAX_THRUST_KGF * 4 * math.sin(thruster_angles[0])
 MAX_NET_Z_KGF = MAX_THRUST_KGF * 4
 MAX_NET_YAW_MOMENT_KGF = MAX_THRUST_KGF * 4 * YAW_TANGENTIAL_FORCE
 MAX_NET_PITCH_MOMENT_KGF = MAX_THRUST_KGF * 4 * HALF_LENGTH
 MAX_NET_ROLL_MOMENT_KGF = MAX_THRUST_KGF * 4 * HALF_WIDTH
+
+MAX_DIAGONAL_THRUST = MAX_THRUST_KGF * 2
 # Logistic boolean input: input(t) = 1 / (1 + e^(-8 * (t - .5)))
 
 
 def quadratic_solve(y, a, b, c):
-    """
-    
-    """
     x1 = -b / (2 * a)
     x2 = math.sqrt(b ** 2 - 4 * a * (c - y)) / (2 * a)
     return (x1 + x2), (x1 - x2)
@@ -150,7 +149,7 @@ def euler_from_quaternion(x, y, z, w):
 
 class Thruster(ABC):
     @abstractmethod
-    def get_us(thrust_kgf):
+    def get_us(self, thrust_kgf):
         pass
 
 
@@ -219,6 +218,10 @@ class T200Thruster(Thruster):
                        2.03, 2.09, 2.13, 2.18, 2.24, 2.27, 2.33, 2.40, 2.46, 2.51, 2.56, 2.62, 2.65, 2.71, 2.78, 2.84, 2.87,
                        2.93, 3.01, 3.04, 3.08, 3.16, 3.23, 3.26, 3.32, 3.38, 3.40, 3.45, 3.50, 3.57, 3.64, 3.71, 3.69, 3.71]
 
+    # abs the list of thrusts because the t100 thrust values are all positive
+    for i in range(len(t200_thrust_12v)):
+        t200_thrust_12v[i] = abs(t200_thrust_12v[i])
+
     t200_mid = int(len(t200_thrust_12v) / 2)
     t200_left = np.poly1d(np.polyfit(t200_pwm_value[:(t200_mid - 9)],  t200_thrust_12v[:(t200_mid - 9)], 2))
     t200_right = np.poly1d(np.polyfit(t200_pwm_value[(t200_mid + 9):], t200_thrust_12v[(t200_mid + 9):], 2))
@@ -241,7 +244,7 @@ class T200Thruster(Thruster):
 class PIDController:
     # TODO: EWMA some inputs?
     # TODO: Derivative filter
-    def __init__(self, p=0, i=0, d=0, f=0, i_zone=None, max_i_accum=None, max_output=None):
+    def __init__(self, p=0.0, i=0.0, d=0.0, f=0.0, i_zone=None, max_i_accum=None, max_output=None):
         self.kP = p
         self.kI = i
         self.kD = d
@@ -305,7 +308,7 @@ class PIDController:
 
 class QuatPIDController:
 
-        def __init__(self, p=0, i=0, d=0):
+        def __init__(self, p=0.0, i=0.0, d=0.0):
             self.kp = p
             self.ki = i
             self.kd = d
@@ -341,14 +344,14 @@ class QuatPIDController:
         
 class Thrusters:
     # Horizontal thruster PCA slots
-    __FLH_ID = 0#
-    __FRH_ID = 5#
-    __BLH_ID = 1#
-    __BRH_ID = 6#
+    __FLH_ID = 0
+    __FRH_ID = 5
+    __BLH_ID = 1
+    __BRH_ID = 6
     # Vertical thruster PCA slots__FLH_ID
-    __FLV_ID = 3#
-    __FRV_ID = 4 #
-    __BLV_ID = 2#
+    __FLV_ID = 3
+    __FRV_ID = 4
+    __BLV_ID = 2
     __BRV_ID = 7
 
     # Thruster creation
