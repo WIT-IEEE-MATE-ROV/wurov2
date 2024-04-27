@@ -341,14 +341,14 @@ class QuatPIDController:
         
 class Thrusters:
     # Horizontal thruster PCA slots
-    __FLH_ID = 0
-    __FRH_ID = 5
-    __BLH_ID = 1
-    __BRH_ID = 6
+    __FLH_ID = 0#
+    __FRH_ID = 5#
+    __BLH_ID = 1#
+    __BRH_ID = 6#
     # Vertical thruster PCA slots__FLH_ID
-    __FLV_ID = 3
-    __FRV_ID = 4
-    __BLV_ID = 2
+    __FLV_ID = 3#
+    __FRV_ID = 4 #
+    __BLV_ID = 2#
     __BRV_ID = 7
 
     # Thruster creation
@@ -474,35 +474,28 @@ class Thrusters:
         # else:
         #     self.previous_yaw = rot_euler[2]
 
-        thruster_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
+        thrust_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
 
         print('Thruster outputs: FLH: %0.04f FRH: %0.04f BLH: %0.04f BRH: %0.04f FLV: %0.04f FRV: %0.04f BLV: %0.04f BRV: %0.04f' % 
-        (thruster_outputs[0], thruster_outputs[1], thruster_outputs[2], thruster_outputs[3],
-        thruster_outputs[4], thruster_outputs[5], thruster_outputs[6], thruster_outputs[7]))
+        (thrust_outputs[0], thrust_outputs[1], thrust_outputs[2], thrust_outputs[3],
+        thrust_outputs[4], thrust_outputs[5], thrust_outputs[6], thrust_outputs[7]))
 
         
-        pca_outputs = thrusts_to_us(thruster_outputs)
-        pca_outputs = [t for t in thruster_outputs]
+        # pca_outputs = thrusts_to_us(thrust_outputs)
 
-            
-        print(f'PCA outputs: {pca_outputs}')
-        # To automatically set stuff, reorder pca_outputs according to the pca slots
-        # TODO: Reorder pca_outputs to allow for one call to set_us
-        self.__pca.set_us(Thrusters.__FLH_ID, [pca_outputs[0]])
-        self.__pca.set_us(Thrusters.__FRH_ID, [pca_outputs[1]])
-        self.__pca.set_us(Thrusters.__BLH_ID, [pca_outputs[2]])
-        self.__pca.set_us(Thrusters.__BRH_ID, [pca_outputs[3]])
-        self.__pca.set_us(Thrusters.__FLV_ID, [pca_outputs[4]])
-        self.__pca.set_us(Thrusters.__FRV_ID, [pca_outputs[5]])
-        self.__pca.set_us(Thrusters.__BLV_ID, [pca_outputs[6]])
-        self.__pca.set_us(Thrusters.__BRV_ID, [pca_outputs[7]])
+        # Calculate PCA microsecond +period for each thruster
+        us_outputs = [Thrusters.all_thrusters[i].get_us(thrust_outputs[i]) for i in range(thrust_outputs)]
+        
+        # Re-order us_outputs to allow just one I2C block write
+        us_outputs_reordered = [us_outputs[0], us_outputs[2], us_outputs[6], us_outputs[4], us_outputs[5], us_outputs[1], us_outputs[3], us_outputs[7]]
+        print(f'PCA outputs: {us_outputs_reordered}')
+
+        self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
 
 
 if __name__ == '__main__':
     # yaw pitch roll
     t = [0, 0, 0]
-    t_r = thrusts_to_us(t)
-    print(t_r)
 
     r = [0, 
          45 * math.pi / 180., 
