@@ -256,7 +256,7 @@ class PCA9685:
 
         self.set_counts(control_num, on_counts, off_counts)
 
-
+    # TODO: Support `us` being a single number
     def set_us(self, control_num: int, us: list):
         end_ctrl = len(us) + control_num
         if end_ctrl > 15:
