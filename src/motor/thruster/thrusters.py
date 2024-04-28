@@ -77,8 +77,11 @@ MAX_NET_Z_KGF = MAX_THRUST_KGF * 4
 MAX_NET_YAW_MOMENT_KGF = MAX_THRUST_KGF * 4 * YAW_TANGENTIAL_FORCE
 MAX_NET_PITCH_MOMENT_KGF = MAX_THRUST_KGF * 4 * HALF_LENGTH
 MAX_NET_ROLL_MOMENT_KGF = MAX_THRUST_KGF * 4 * HALF_WIDTH
-
 MAX_DIAGONAL_THRUST = MAX_THRUST_KGF * 2
+
+MAX_YAW_RATE_RAD_S = 1
+MAX_PITCH_RATE_RAD_S = 1
+MAX_ROLL_RATE_RAD_S = 1
 
 NET_CURRENT_LIMIT = 20
 
@@ -482,6 +485,7 @@ class Thrusters:
     all_thrusters = [flh_thruster, frh_thruster, blh_thruster, brh_thruster,
                      flv_thruster, frv_thruster, blv_thruster, brv_thruster]
 
+
     def __init__(self):
         self.__pca = PCA9685(0x40, 100, measured_frequency_hz=105.6)
         self.__pca.software_reset()
@@ -491,6 +495,7 @@ class Thrusters:
         self.desired_twist = Twist()
         self.rotation_quat = Quaternion()
         self.desired_rotation = Quaternion(0, 0, 0, 1)
+        self.rotation_offset = Quaternion()
 
         self.previous_roll = 0
         self.previous_pitch = 0
@@ -502,9 +507,11 @@ class Thrusters:
         self.quat_controller = QuatPIDController(p=1.1)
         self.depth_controller = PIDController(p=0, d=0)
 
+
     @property
     def pca(self):
         return self.__pca
+
 
     def set_rotation(self, r: Quaternion) -> None:
         """
@@ -515,11 +522,18 @@ class Thrusters:
         """
         self.rotation_quat = r
 
+
     def set_desired_rotation(self, r_d: Quaternion) -> None:
         self.desired_rotation = r_d
 
+    
+    def set_rotation_offset(self, r_o: Quaternion):
+        self.rotation_offset = r_o
+
+
     def to_np_quat(q: Quaternion):
         return np.quaternion(q.w, q.x, q.y, q.z)
+
 
     def set_thrust(self, x: float, y: float, z: float, roll: float, pitch: float, yaw: float, depth_lock: bool = False,
                    depth_command: float = None) -> None:
@@ -559,8 +573,6 @@ class Thrusters:
 
         self.desired_twist = Twist(Vector3(x, y, z), Vector3(roll, pitch, yaw))
 
-    # def set_thrust(self, t: Twist, depth_lock=False):
-    #     self.set_thrust(t.linear.x, t.linear.y, t.linear.z, t.angular.z, t.angular.y, t.angular.x, depth_lock=depth_lock)
 
     def update(self, control_orientation=False) -> None:
         """
@@ -569,7 +581,6 @@ class Thrusters:
 
         d = self.desired_twist
 
-        # rot_euler = euler_from_quaternion(self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z, self.rotation_quat.w)
         if control_orientation:
             q_r = np.quaternion(self.rotation_quat.w, self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z)
             q_d = Thrusters.to_np_quat(self.desired_rotation)
@@ -578,24 +589,6 @@ class Thrusters:
             d.angular.x = qc_output[0]
             d.angular.y = qc_output[1]
             d.angular.z = qc_output[2]
-
-        # if self.desired_twist.angular.x < 0.01:
-        #     self.roll_controller.set_setpoint(self.previous_roll)
-        #     d.angular.x = self.roll_controller.calculate(rot_euler[0])
-        # else:
-        #     self.previous_roll = rot_euler[0]
-
-        # if self.desired_twist.angular.y < 0.01:
-        #     self.pitch_controller.set_setpoint(self.previous_pitch)
-        #     d.angular.y = self.pitch_controller.calculate(rot_euler[1])
-        # else:
-        #     self.previous_pitch = rot_euler[1]
-
-        # if self.desired_twist.angular.z < 0.01:
-        #     self.yaw_controller.set_setpoint(self.previous_yaw)
-        #     d.angular.z = self.yaw_controller.calculate(rot_euler[2])
-        # else:
-        #     self.previous_yaw = rot_euler[2]
 
         thrust_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
 
