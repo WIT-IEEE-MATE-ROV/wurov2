@@ -18,6 +18,7 @@ current_rotation = Quaternion()
 light_on = False
 arm_on = False
 control_orientation = False
+set_setpoint = False
 scale = 4
 
 def rotate_2d(x,y, angle_rad):
@@ -32,7 +33,7 @@ def deadband(input, min_input):
         return 0
 
 def callback_joystick(data):
-    global light_on, arm_on, control_orientation
+    global light_on, arm_on, control_orientation, set_setpoint
     # Does this once joystick sends data
     left_trigger = (-data.axes[2] + 1) / 2 
     right_trigger = (-data.axes[5] + 1) / 2 
@@ -43,6 +44,7 @@ def callback_joystick(data):
     left_bumper = data.buttons[4]
     right_bumper = -data.buttons[5]
     a_button = data.buttons[0]
+    start_button = data.buttons[0]
 
     left_stick_x, left_stick_y = rotate_2d(left_stick_x, left_stick_y, -np.pi/2)
     roll_bumper = left_bumper+right_bumper
@@ -68,8 +70,13 @@ def callback_joystick(data):
         control_orientation = True
     else:
         control_orientation = False
-        
-    
+
+    if start_button:
+        set_setpoint = True
+    else:
+        set_setpoint = False
+
+
 def callback_quat(data, thrusters):
     # print(f'thruster_node quat recieved: {data}')
     thrusters.set_rotation(data)
@@ -89,12 +96,13 @@ def thruster_pub():
     rospy.init_node('thrusters', anonymous=True)
     joy_sub = rospy.Subscriber("joy", Joy, callback_joystick) # Gets data from joy msg in float32 array for axes and int32 array for buttons
     quat_sub = rospy.Subscriber("bno/quat", Quaternion, callback_quat, callback_args=(thrusters))
+
+    
+
     rate = rospy.Rate(1 / (LOOP_PERIOD_MS / 1000))
 
     while not rospy.is_shutdown():
-        thrusters.set_thrust(desired_twist.linear.x, desired_twist.linear.y, desired_twist.linear.z,
-                            desired_twist.angular.x, desired_twist.angular.y, desired_twist.angular.z,
-                            depth_lock=False)
+        thrusters.set_thrust(desired_twist, depth_lock=False)
 
         thrusters.update(control_orientation=control_orientation)
 
@@ -104,6 +112,9 @@ def thruster_pub():
             robo_arm.open()
         else:
             robo_arm.close()
+        
+        if set_setpoint:
+            thrusters.set_test_rot_setpoint()
         
         # rate.sleep()
     
