@@ -6,8 +6,14 @@ from pca import PCA9685
 from queue import Queue
 from abc import ABC, abstractmethod
 # from typing import override
-from controllers.pid import PIDController, QuatPIDController
+
 from thruster_data import *
+
+import sys
+sys.path.append('/home/jetson/catkin_ws/src/wurov2_0/src/controllers')
+
+from pid import PIDController, QuatPIDController
+
 import quaternion
 import time
 
@@ -352,6 +358,10 @@ class Thrusters:
         """
         self.rotation_quat = r
 
+    
+    def get_ros_rotation(self):
+        return self.rotation_quat
+
 
     def set_desired_rotation(self, r_d: Quaternion) -> None:
         self.desired_rotation = r_d
@@ -378,6 +388,10 @@ class Thrusters:
 
     def get_thrust_outputs(self):
         return self.thrust_outputs
+    
+
+    def get_pwm_period_outputs(self):
+        return self.us_outputs
 
 
     def set_thrust(self, thrust_twist: Twist, depth_lock: bool = False,

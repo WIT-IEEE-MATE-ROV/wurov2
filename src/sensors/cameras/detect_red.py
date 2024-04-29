@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Description: Turns image topic from ROS to an opencv2 message and detects red.
 
 import sys
