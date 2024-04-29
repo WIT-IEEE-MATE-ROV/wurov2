@@ -5,10 +5,7 @@
 #sudo chmod a+rw /dev/i2c-*
 source /opt/ros/noetic/setup.bash
 source catkin_ws/devel/setup.bash
-# export ROS_MASTER_URI=http://192.168.0.135:11311/
-# export ROS_IP="192.168.0.217"
-export ROS_MASTER_URI=http://10.199.98.180:11311/
-export ROS_IP="10.199.98.153"
-
+export ROS_MASTER_URI=http://192.168.0.135:11311/
+export ROS_IP="192.168.0.217"
 
 exec "$@"
