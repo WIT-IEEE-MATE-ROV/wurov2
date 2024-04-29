@@ -8,6 +8,8 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
+image_path = r'/home/tedi/rovImages'
+
 class image_converter:
 
   def __init__(self):
@@ -24,18 +26,20 @@ class image_converter:
 
     def calculate_distance(cx, cy, center_x, center_y):
       # Assuming a fixed real-world size for the object (adjust as needed)
-      object_real_size_cm = 5.0  # Example: 10 cm
+      object_real_size_cm = 7.0  # Example: 10 cm
 
       # Calculate distance based on the size of the bounding box
-      distance = object_real_size_cm * (0.35 / (w / imageFrame.shape[1]))  # Assumes width 'w' of bounding box represents real-world size
+      distance = object_real_size_cm * (1.8 / (w / imageFrame.shape[1]))  # Assumes width 'w' of bounding box represents real-world size
       return distance
     
     hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
 
     # Set range for red color and
     # define mask
-    red_lower = np.array([136, 87, 111], np.uint8)
-    red_upper = np.array([180, 255, 255], np.uint8)
+    # red_lower = np.array([136, 87, 111], np.uint8)
+    # red_upper = np.array([180, 255, 255], np.uint8)
+    red_lower = np.array([0,50,50], np.uint8)
+    red_upper = np.array([6,255,255], np.uint8)
     red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
 
     # Set range for green color and
@@ -63,7 +67,7 @@ class image_converter:
         if area > 300 and area > largest_contour_area:
             largest_contour = contour
             largest_contour_area = area
-
+    
     if largest_contour is not None:
         x, y, w, h = cv2.boundingRect(largest_contour)
         imageFrame = cv2.rectangle(imageFrame, (x, y),
@@ -77,14 +81,21 @@ class image_converter:
         # Calculate and display distance in centimeters
         distance = calculate_distance(x + w // 2, y + h // 2, imageFrame.shape[1] // 2, imageFrame.shape[0] // 2)
         cv2.putText(imageFrame, f'Distance: {distance:.2f} cm', (x, y - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-
-    imageFrame = cv2.flip(imageFrame,1)
+    
+    # imageFrame = cv2.flip(imageFrame,1)
     cv2.imshow("Image window", imageFrame)
     cv2.waitKey(3)
+
+# def callback_joystick(data):
+#   if data.buttons[1]:
+        
+#   else:
+
 
 def main(args):
   ic = image_converter()
   rospy.init_node('image_converter', anonymous=True)
+  # joy_sub = rospy.Subscriber("joy", Joy, callback_joystick)
   try:
     rospy.spin()
   except KeyboardInterrupt:

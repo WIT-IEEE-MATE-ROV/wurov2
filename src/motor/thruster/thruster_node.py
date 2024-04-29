@@ -125,7 +125,6 @@ def thruster_pub():
     rate = rospy.Rate(1 / (LOOP_PERIOD_MS / 1000))
 
     while not rospy.is_shutdown():
-
         thrusters.set_thrust(desired_twist, depth_lock=False)
 
         thrusters.update(control_orientation=control_orientation)
