@@ -19,7 +19,7 @@ light_on = False
 arm_on = False
 control_orientation = False
 set_setpoint = False
-scale = 4
+scale = 3
 
 def rotate_2d(x,y, angle_rad):
     x_p = x * np.cos(angle_rad) - y * np.sin(angle_rad)
@@ -52,7 +52,7 @@ def callback_joystick(data):
     desired_twist.linear.x = deadband(left_stick_x, 0.1) * scale
     desired_twist.linear.y = deadband(left_stick_y, 0.1) * scale
     desired_twist.linear.z = deadband(right_trigger - left_trigger, 0.1) * scale # no press = 1, full press = -1
-    desired_twist.angular.z = -deadband(right_stick_x, 0.1)  *2 # yaw
+    desired_twist.angular.z = -deadband(right_stick_x, 0.1)  * 1.5 # yaw
     desired_twist.angular.y = deadband(right_stick_y, 0.1) * scale# pitch
     desired_twist.angular.x = roll_bumper
     # print(f'right_trigger: {data.axes[5]}')
