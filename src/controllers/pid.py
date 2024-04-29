@@ -81,7 +81,7 @@ class QuatPIDController:
         self.setpoint = q
 
     def calculate(self, q):
-        error = q.inverse() - self.setpoint
+        error = self.setpoint * q.inverse()
 
         if error.w < 0:
             error = -error
