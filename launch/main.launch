@@ -1,13 +1,19 @@
 <launch>
-    <!-- <node name="joy_node" pkg="joy" type="joy_node"/>  -->
+    <node name="joy_node" pkg="joy" type="joy_node"/> 
+
+    <!-- Opens respective nodes needs to get imu data from rasp pi and also opens simulation in rviz for imu orientation -->
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find wurov2_0)/rviz/test_bench_model.rviz"/> 
+
+    <!-- For NXF module conversions -->
     <!-- <include file="$(find imu_filter_madgwick)/launch/imu_filter_madgwick.launch" /> -->
     <!-- <node name="orientation" pkg="wurov2_0" type="euler_conversion.py"/> -->
 
+    <!-- Dont forget to change the config file to the ip addresses you use with your device -->    
+    <machine name="WUROV" address="10.0.10.184" env-loader="/home/jetson/catkin_ws/src/wurov2_0/config/setup.sh" user="jetson" password="jetson" default="false"/>
+    <node machine="WUROV" name="bno" pkg="wurov2_0" type="bno_node.py" />
+    <node machine="WUROV" name="si" pkg="wurov2_0" type="MPL3115A2_node.py" />
+    <node machine="WUROV" name="mpl" pkg="wurov2_0" type="Si7021_node.py" />
     
-    <!-- Opens respective nodes needs to get imu data from rasp pi and also opens simulation in rviz for imu orientation -->
-    <!-- <machine name="WUROV" address="10.0.10.184" env-loader="/home/jetson/catkin_ws/src/wurov2_0/config/setup.sh" user="jetson" password="jetson" default="false"/> -->
-    <!-- <node machine="WUROV" name="bno" pkg="wurov2_0" type="bno_node.py" /> -->
     <!-- <node machine="WUROV" name="thrusters" pkg="wurov2_0" type="thruster_node.py" /> -->
     <!-- <include machine="WUROV" file="/home/jetson/catkin_ws/src/wurov2_0/launch/cameras.launch"/> -->
 </launch>
