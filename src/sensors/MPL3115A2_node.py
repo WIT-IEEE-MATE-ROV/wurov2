@@ -25,7 +25,7 @@ def sensor_pub():
     pressure_pub = rospy.Publisher('/mpl/pressure_hPa', Float64, queue_size=3)
     altitude_pub = rospy.Publisher('/mpl/altitude_m', Float64, queue_size=3)
     temperature_pub = rospy.Publisher('/mpl/temperature_f', Float64, queue_size=3)
-    rate = rospy.Rate(1/ (20 / 1000))
+    rate = rospy.Rate(4)
     
     pres_data = Float64()
     alt_data = Float64()

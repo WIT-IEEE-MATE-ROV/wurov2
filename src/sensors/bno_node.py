@@ -6,6 +6,8 @@ import board
 import math
 import busio
 from geometry_msgs.msg import Vector3, Quaternion
+import numpy as np
+import quaternion
 # from adafruit_bno08x import BNO_REPORT_GAME_ROTATION_VECTOR
 from adafruit_bno08x import (
     BNO_REPORT_GAME_ROTATION_VECTOR,
@@ -16,7 +18,7 @@ from adafruit_bno08x import (
 )
 from adafruit_bno08x.i2c import BNO08X_I2C
 from sensor_msgs.msg import Imu
-import adafruit_bno055
+# import adafruit_bno055
 from tf2_msgs.msg import TFMessage
 
 LOOP_PERIOD_MS = 20.
@@ -102,6 +104,23 @@ def bno_main():
         euler = [c * 180/3.14159 for c in euler_from_quaternion(quat[0], quat[1], quat[2], quat[3])]
         euler_ros = Vector3(euler[0], euler[1], euler[2])
 
+# x: -0.1226560957111919
+# y: -0.6980003645098898
+# z: 0.704172011831037
+# w: 0.04294258101077972
+        zero = np.quaternion(0.04294258101077972, -0.1226560957111919, -0.6980003645098898, 0.704172011831037)
+        q = np.quaternion(quat_ros.w, quat_ros.x, quat_ros.y, quat_ros.z)
+        q = q * np.quaternion(-math.sqrt(2) / 2, 0, -math.sqrt(2) / 2, 0)
+        q = q * np.quaternion(math.sqrt(2) / 2, math.sqrt(2) / 2, 0, 0)
+        quat_ros.w = q.w
+        quat_ros.x = q.x
+        quat_ros.y = q.y
+        quat_ros.z = q.z
+
+        e = euler_from_quaternion(q.x, q.y, q.z, q.w)
+        euler_ros.x = e[0] * 180 / math.pi
+        euler_ros.y = e[1] * 180 / math.pi
+        euler_ros.z = e[2] * 180 / math.pi
         pub_imu_data.publish(imu_data)
         quat_publisher.publish(quat_ros)
         euler_publisher.publish(euler_ros)
