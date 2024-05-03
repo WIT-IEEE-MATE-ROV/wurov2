@@ -13,7 +13,7 @@ import numpy as np
 import math
 
 LOOP_PERIOD_MS = 20.
-desired_twist = Twist()
+desired_twist = Twist(Vector3(0, 0, 0), Vector3(0, 0, 0))
 current_rotation = Quaternion()
 light_on = False
 arm_on = False
@@ -56,7 +56,7 @@ def callback_joystick(data):
     desired_twist.linear.z = deadband(right_trigger - left_trigger, 0.1) * scale # no press = 1, full press = -1
     desired_twist.angular.z = -deadband(right_stick_x, 0.1)  * 1.5 # yaw
     desired_twist.angular.y = deadband(right_stick_y, 0.1)# pitch
-    desired_twist.angular.x = roll_bumper * scale
+    desired_twist.angular.x = roll_bumper
     # print(f'right_trigger: {data.axes[5]}')
     if data.axes[7] == 1.0:
         light_on = True
@@ -119,8 +119,16 @@ def thruster_pub():
     micros_array.layout = layout
     micros_array.data = [0] * 8
 
+    thruster_rot = Vector3()
+    thruster_quat = Quaternion()
+    setpoint_rot = Vector3()
+
     thrust_pub = rospy.Publisher('thruster_node/thrust_kgf', Float32MultiArray, queue_size=3)
-    micros_pub = rospy.Publisher('thruster_node/micros', Float32MultiArray, queue_size = 3)
+    micros_pub = rospy.Publisher('thruster_node/micros', Float32MultiArray, queue_size=3)
+    thruster_rot_euler_pub = rospy.Publisher('thruster_node/rot_euler', Vector3, queue_size=3)
+    thruster_rot_quat_pub = rospy.Publisher('thruster_node/rot_quat', Quaternion, queue_size=3)
+
+    rot_setpoint_pub = rospy.Publisher('thruster_node/setpoint', Vector3, queue_size=3)
 
     rate = rospy.Rate(1 / (LOOP_PERIOD_MS / 1000))
 
@@ -140,13 +148,19 @@ def thruster_pub():
             thrusters.set_test_rot_setpoint()
 
         if set_offset:
-            thrusters.set_offset(thrusters.get_ros_rotation())
+            thrusters.set_rotation_offset()
         
         thrust_array.data = thrusters.get_thrust_outputs()
         micros_array.data = thrusters.get_pwm_period_outputs()
+        thruster_rot = thrusters.get_ros_current_rotation_euler()
+        thruster_quat = thrusters.get_ros_quat()
+        setpoint_rot = thrusters.get_ros_test_rot_setpoint_euler()
 
         thrust_pub.publish(thrust_array)
         micros_pub.publish(micros_array)
+        thruster_rot_euler_pub.publish(thruster_rot)
+        thruster_rot_quat_pub.publish(thruster_quat)
+        rot_setpoint_pub.publish(setpoint_rot)
         # rate.sleep()
     
     # spin() simply keeps python from exiting until this node is stopped

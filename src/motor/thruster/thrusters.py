@@ -325,10 +325,10 @@ class Thrusters:
 
         self.desired_twist = Twist()
 
-        self.rotation_quat = Quaternion()
+        self.rotation_quat = Quaternion(0, 0, 0, 1)
         self.desired_rotation = Quaternion(0, 0, 0, 1)
-        self.rotation_offset = Quaternion()
-        self.test_rot_setpoint = Quaternion()
+        self.rotation_offset = np.quaternion(1, 0, 0, 0)
+        self.test_rot_setpoint = np.quaternion(1, 0, 0, 0)
 
         self.thust_outputs = [0] * 8
         self.us_outputs = [0] * 8
@@ -356,6 +356,7 @@ class Thrusters:
         Args:
             r (Quaternion): ROV rotation
         """
+        # a = Quaternion(r.z, r.y, r.x, r.w)
         self.rotation_quat = r
 
     
@@ -367,16 +368,60 @@ class Thrusters:
         self.desired_rotation = r_d
 
     
-    def set_rotation_offset(self, r_o: Quaternion):
-        self.rotation_offset = r_o
+    def set_rotation_offset(self):
+        # self.rotation_offset = self.rotation_quat
+        self.rotation_offset = to_np_quat(self.rotation_quat)
 
 
     def get_current_rotation(self) -> np.quaternion:
-        to_np_quat(self.rotation_offset).inverse() - to_np_quat(self.rotation_quat)
+        r_c = to_np_quat(self.rotation_quat) # Rotation current
+        # r_c = to_np_quat(a) # Rotation current
+
+        # r_o = to_np_quat(self.rotation_offset) # Rotation offset
+        r_o = self.rotation_offset # Rotation offset
+        # r_o = np.quaternion(1, .6, 0, .8)
+        r_r =  r_c.inverse() * r_o * np.quaternion(0.7071, 0.0, .7071, 0.0) # Rotation of ROV
+        # r_r = r_c
+        # print(r_r)
+        return r_r
 
     
     def set_test_rot_setpoint(self):
         self.test_rot_setpoint = self.get_current_rotation()
+
+
+    def get_ros_quat(self):
+        ros_quat = Quaternion()
+        q = self.get_current_rotation()
+        q_arr = quaternion.as_float_array(q)
+        
+        ros_quat.w = q_arr[0]
+        ros_quat.x = q_arr[1]
+        ros_quat.y = q_arr[2]
+        ros_quat.z = q_arr[3]
+
+        return ros_quat
+
+    
+    def get_ros_test_rot_setpoint_euler(self):
+        ros_rot = Vector3()
+        e = quaternion.as_euler_angles(self.test_rot_setpoint)
+        ros_rot.x = e[2] * (180. / math.pi)
+        ros_rot.y = e[1] * (180. / math.pi)
+        ros_rot.z = e[0] * (180. / math.pi)
+        return ros_rot
+    
+
+    def get_ros_current_rotation_euler(self):
+        ros_rot = Vector3()
+        q = self.get_current_rotation()
+        q_arr = quaternion.as_float_array(q)
+        e = euler_from_quaternion(q_arr[0], q_arr[1], q_arr[2], q_arr[3])
+        # e = quaternion.as_euler_angles(q)
+        ros_rot.x = e[2] * (180.0 / math.pi)
+        ros_rot.y = e[1] * (180.0 / math.pi)
+        ros_rot.z = e[0] * (180.0 / math.pi)
+        return ros_rot
 
 
     def get_roll_pitch_feedforwards(self, rot: Quaternion):
@@ -445,7 +490,7 @@ class Thrusters:
         if control_orientation:
             # q_r = np.quaternion(self.rotation_quat.w, self.rotation_quat.x, self.rotation_quat.y, self.rotation_quat.z)
             q_r = self.get_current_rotation()
-            q_d = Thrusters.to_np_quat(self.test_rot_setpoint)
+            q_d = to_np_quat(self.test_rot_setpoint)
             self.quat_controller.set_setpoint(q_d)
             qc_output = self.quat_controller.calculate(q_r)
             d.angular.x = qc_output[0]
@@ -456,7 +501,7 @@ class Thrusters:
         thrust_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
 
         print(
-            'Thruster outputs: FLH: %0.04f FRH: %0.04f BLH: %0.04f BRH: %0.04f FLV: %0.04f FRV: %0.04f BLV: %0.04f BRV: %0.04f' %
+            'Thruster outputs: FLH: %0.04f FRH: %0.04f BLH: %0.04f BRH: %0.04f | FLV: %0.04f FRV: %0.04f BLV: %0.04f BRV: %0.04f' %
             (thrust_outputs[0], thrust_outputs[1], thrust_outputs[2], thrust_outputs[3],
              thrust_outputs[4], thrust_outputs[5], thrust_outputs[6], thrust_outputs[7]))
 
@@ -473,7 +518,7 @@ class Thrusters:
         us_outputs_reordered = [us_outputs[0], us_outputs[2], us_outputs[6], us_outputs[4], us_outputs[5],
                                 us_outputs[1], us_outputs[3], us_outputs[7]]
         
-        print(f'PCA outputs: {us_outputs_reordered}')
+        # print(f'PCA outputs: {us_outputs_reordered}')
 
         self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
 

@@ -15,6 +15,5 @@ class Headlamp:
 
         # Set brightness to b only if it's a new value
         if not b == self.__previous_us:
-            print(f'setting pca us {b}')
             self.__pca.set_us(self.__pca_slot, [b])
             self.__previous_us = b
