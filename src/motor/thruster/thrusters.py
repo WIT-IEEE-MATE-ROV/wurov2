@@ -519,8 +519,13 @@ class Thrusters:
                                 us_outputs[1], us_outputs[3], us_outputs[7]]
         
         # print(f'PCA outputs: {us_outputs_reordered}')
-
-        self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
+        try:
+            self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
+        except OSError as e:
+            print(f"[ERROR] Resetting PCA outputs \n {e}")
+            us_outputs_reordered = [1500]*8
+            #self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
+        
 
 
 if __name__ == '__main__':
