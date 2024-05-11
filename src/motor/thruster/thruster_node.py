@@ -4,7 +4,7 @@ import rospy
 from std_msgs.msg import Float64, Float32MultiArray, MultiArrayLayout, MultiArrayDimension
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Vector3, Twist, Quaternion
-from thrusters import Thrusters
+from thrusters import Thrusters, MAX_NET_X_KGF, MAX_ROLL_RATE_RAD_S
 from light import Headlamp
 from robo_arm import RoboArm
 from pca import PCA9685
@@ -17,10 +17,12 @@ desired_twist = Twist(Vector3(0, 0, 0), Vector3(0, 0, 0))
 current_rotation = Quaternion()
 light_on = False
 arm_on = False
-control_orientation = False
-set_setpoint = False
+control_orientation = True
+set_setpoint = True
 set_offset = False
-scale = 2
+linear_scale = MAX_NET_X_KGF
+rotation_scale = MAX_ROLL_RATE_RAD_S
+depth_setpoint = 0
 
 def rotate_2d(x,y, angle_rad):
     x_p = x * np.cos(angle_rad) - y * np.sin(angle_rad)
@@ -38,24 +40,25 @@ def callback_joystick(data):
     # Does this once joystick sends data
     left_trigger = (-data.axes[2] + 1) / 2 
     right_trigger = (-data.axes[5] + 1) / 2 
-    left_stick_x = data.axes[0]
-    left_stick_y = data.axes[1]
-    right_stick_x = data.axes[3]
+    left_stick_x = -data.axes[0]
+    left_stick_y = -data.axes[1]
+    right_stick_x = -data.axes[3]
     right_stick_y = data.axes[4]
     left_bumper = data.buttons[4]
     right_bumper = -data.buttons[5]
     a_button = data.buttons[0]
     b_button = data.buttons[1]
+    x_button = data.buttons[2] 
     start_button = data.buttons[7]
 
     left_stick_x, left_stick_y = rotate_2d(left_stick_x, left_stick_y, -np.pi/2)
     roll_bumper = left_bumper + right_bumper
 
-    desired_twist.linear.x = deadband(left_stick_x, 0.1) * scale
-    desired_twist.linear.y = deadband(left_stick_y, 0.1) * scale
-    desired_twist.linear.z = deadband(right_trigger - left_trigger, 0.1) * scale # no press = 1, full press = -1
-    desired_twist.angular.z = -deadband(right_stick_x, 0.1)  * 1.5 # yaw
-    desired_twist.angular.y = deadband(right_stick_y, 0.1)# pitch
+    desired_twist.linear.x = deadband(left_stick_x, 0.1) * linear_scale
+    desired_twist.linear.y = deadband(left_stick_y, 0.1) * linear_scale
+    desired_twist.linear.z = deadband(right_trigger - left_trigger, 0.1) * linear_scale # no press = 1, full press = -1
+    desired_twist.angular.z = -deadband(right_stick_x, 0.1)  * rotation_scale # yaw
+    desired_twist.angular.y = deadband(right_stick_y, 0.1) * rotation_scale# pitch
     desired_twist.angular.x = roll_bumper
     # print(f'right_trigger: {data.axes[5]}')
     if data.axes[7] == 1.0:
@@ -161,7 +164,7 @@ def thruster_pub():
         thruster_rot_euler_pub.publish(thruster_rot)
         thruster_rot_quat_pub.publish(thruster_quat)
         rot_setpoint_pub.publish(setpoint_rot)
-        # rate.sleep()
+        #rate.sleep()
     
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()

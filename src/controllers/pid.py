@@ -80,8 +80,14 @@ class QuatPIDController:
     def set_setpoint(self, q):
         self.setpoint = q
 
+
+    def get_setpoint(self):
+        return self.setpoint 
+
+
     def calculate(self, q):
-        error = self.setpoint.inverse() * q
+        # error = self.setpoint.inverse() * q
+        error = q.inverse() * self.setpoint
 
         if error.w < 0:
             error = -error
@@ -94,9 +100,9 @@ class QuatPIDController:
         # outputs[1] = error.y * self.kp + ((error.y - self.prev_y_e) / dt) * self.kd
         # outputs[2] = error.z * self.kp + ((error.z - self.prev_z_e) / dt) * self.kd
 
-        outputs[0] = error.x * 1.1 + ((error.x - self.prev_x_e) / dt) * 0.0
-        outputs[1] = error.y * 1.1 + ((error.y - self.prev_y_e) / dt) * 0.0
-        outputs[2] = error.z * 1.1 + ((error.z - self.prev_z_e) / dt) * 0.0
+        outputs[0] = error.x * 2 + ((error.x - self.prev_x_e) / dt) * 0.0
+        outputs[1] = error.y * 2 + ((error.y - self.prev_y_e) / dt) * 0.0
+        outputs[2] = error.z * 2 + ((error.z - self.prev_z_e) / dt) * 0.0
 
         self.prev_x_e = error.x
         self.prev_y_e = error.y

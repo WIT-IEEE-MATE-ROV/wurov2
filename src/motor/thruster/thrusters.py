@@ -78,7 +78,7 @@ horizontal_factor = h_V @ h_S_inv_0 @ h_U_T
 vertical_factor = v_V @ v_S_inv_0 @ v_U_T
 
 # Constants to use for feedforward control
-MAX_THRUST_KGF = 1.768181818
+MAX_THRUST_KGF = 2.4
 MAX_NET_X_KGF = MAX_THRUST_KGF * 4 * math.cos(thruster_angles[0])
 MAX_NET_Y_KGF = MAX_THRUST_KGF * 4 * math.sin(thruster_angles[0])
 MAX_NET_Z_KGF = MAX_THRUST_KGF * 4
@@ -305,14 +305,14 @@ class Thrusters:
     __BRV_ID = 7
 
     # Thruster creation
-    flh_thruster = T100Thruster()
-    frh_thruster = T100Thruster()
-    blh_thruster = T100Thruster()
-    brh_thruster = T100Thruster()
-    flv_thruster = T100Thruster()
-    frv_thruster = T100Thruster()
-    blv_thruster = T100Thruster()
-    brv_thruster = T100Thruster()
+    flh_thruster = T200Thruster()
+    frh_thruster = T200Thruster()
+    blh_thruster = T200Thruster()
+    brh_thruster = T200Thruster()
+    flv_thruster = T200Thruster()
+    frv_thruster = T200Thruster()
+    blv_thruster = T200Thruster()
+    brv_thruster = T200Thruster()
     all_thrusters = [flh_thruster, frh_thruster, blh_thruster, brh_thruster,
                      flv_thruster, frv_thruster, blv_thruster, brv_thruster]
 
@@ -380,7 +380,7 @@ class Thrusters:
         # r_o = to_np_quat(self.rotation_offset) # Rotation offset
         r_o = self.rotation_offset # Rotation offset
         # r_o = np.quaternion(1, .6, 0, .8)
-        r_r =  r_c.inverse() * r_o * np.quaternion(0.7071, 0.0, .7071, 0.0) # Rotation of ROV
+        r_r =  r_c.inverse() * r_o 
         # r_r = r_c
         # print(r_r)
         return r_r
@@ -389,6 +389,13 @@ class Thrusters:
     def set_test_rot_setpoint(self):
         self.test_rot_setpoint = self.get_current_rotation()
 
+
+    #def get_ros_current_rotation_euler
+
+
+    def get_test_rot_sepoint(self):
+        pass
+    
 
     def get_ros_quat(self):
         ros_quat = Quaternion()
@@ -405,22 +412,21 @@ class Thrusters:
     
     def get_ros_test_rot_setpoint_euler(self):
         ros_rot = Vector3()
-        e = quaternion.as_euler_angles(self.test_rot_setpoint)
-        ros_rot.x = e[2] * (180. / math.pi)
-        ros_rot.y = e[1] * (180. / math.pi)
-        ros_rot.z = e[0] * (180. / math.pi)
+        e = euler_from_quaternion(self.test_rot_setpoint.x, self.test_rot_setpoint.y, self.test_rot_setpoint.z, self.test_rot_setpoint.w)
+        ros_rot.x = e[0] * (180.0 / math.pi)
+        ros_rot.y = e[1] * (180.0 / math.pi)
+        ros_rot.z = e[2] * (180.0 / math.pi)
         return ros_rot
     
 
     def get_ros_current_rotation_euler(self):
         ros_rot = Vector3()
         q = self.get_current_rotation()
-        q_arr = quaternion.as_float_array(q)
-        e = euler_from_quaternion(q_arr[0], q_arr[1], q_arr[2], q_arr[3])
+        e = euler_from_quaternion(q.x, q.y, q.z, q.w)
         # e = quaternion.as_euler_angles(q)
-        ros_rot.x = e[2] * (180.0 / math.pi)
+        ros_rot.x = e[0] * (180.0 / math.pi)
         ros_rot.y = e[1] * (180.0 / math.pi)
-        ros_rot.z = e[0] * (180.0 / math.pi)
+        ros_rot.z = e[2] * (180.0 / math.pi)
         return ros_rot
 
 
@@ -497,7 +503,6 @@ class Thrusters:
             d.angular.y = qc_output[1]
             d.angular.z = qc_output[2]
 
-
         thrust_outputs = get_thruster_outputs(d.linear.x, d.linear.y, d.linear.z, d.angular.x, d.angular.y, d.angular.z)
 
         print(
@@ -524,26 +529,8 @@ class Thrusters:
         except OSError as e:
             print(f"[ERROR] Resetting PCA outputs \n {e}")
             us_outputs_reordered = [1500]*8
-            #self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
+            self.__pca.set_us(Thrusters.__FLH_ID, us_outputs_reordered)
         
 
-
 if __name__ == '__main__':
-    # yaw pitch roll
-    t = [0, 0, 0]
-
-    r = [0,
-         45 * math.pi / 180.,
-         45 * math.pi / 180.]
-    current_rotation = Rotation.from_euler('zyx', r)
-    print('ROV rotation: (%.03f, %.03f, %.03f)' % (r[0], r[1], r[2]))
-
-    # x y z velocities
-    des = [0, 1, 0]
-    desired_global_direction = np.array([des[0], des[1], des[2]])
-    print('Desired Global: (%.03f, %.03f, %.03f)' % (
-    desired_global_direction[0], desired_global_direction[1], desired_global_direction[2]))
-
-    rov_relative_direction = current_rotation.apply(desired_global_direction)
-    print('ROV net thrust:(%.03f, %.03f, %.03f)' % (
-    rov_relative_direction[0], rov_relative_direction[1], rov_relative_direction[2]))
+    pass

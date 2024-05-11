@@ -354,11 +354,11 @@ if __name__ == '__main__':
 
     # exit()
 
-    # LIGHT TEST
-    p = PCA9685(0x41, 100)
-    p.software_reset()
-    p.setup()
-    p.set_sleep(False)
+    # # LIGHT TEST
+    # p = PCA9685(0x41, 100)
+    # p.software_reset()
+    # p.setup()
+    # p.set_sleep(False)
     # try:
     #     while True:
     #         p.set_us(8, [1900])
@@ -376,16 +376,29 @@ if __name__ == '__main__':
     # p1.set_sleep(False)
     # exit()
 
+
+     # Horizontal thruster PCA slots
+    __FLH_ID = 0
+    __FRH_ID = 5
+    __BLH_ID = 1
+    __BRH_ID = 6
+    # Vertical thruster PCA slots__FLH_ID
+    __FLV_ID = 3
+    __FRV_ID = 4
+    __BLV_ID = 2
+    __BRV_ID = 7
+
+
     try:
         while True:
-            p.set_us(8, [1900])
-            time.sleep(0.5)
-            p.set_us(8, [1100])
-            time.sleep(0.5)
-            on_counts, off_counts = p1.get_counts(0)
-            print(f'Before on_counts = {on_counts}, off_counts = {off_counts}')
+            # p1.set_us(8, [1900])
+            # time.sleep(0.5)
+            # p1.set_us(8, [1100])
+            # time.sleep(0.5)
+            # on_counts, off_counts = p1.get_counts(0)
+            # print(f'Before on_counts = {on_counts}, off_counts = {off_counts}')
             # p.set_duty_cycles(0, [0])
-            p1.set_us(3, [1500])
+            p1.set_us(__BLV_ID , [1500])
             on_counts, off_counts = p1.get_counts(0)
             print(f' After on_counts = {on_counts}, off_counts = {off_counts}')
 
@@ -394,7 +407,7 @@ if __name__ == '__main__':
             on_counts, off_counts = p1.get_counts(0)
             print(f'Before on_counts = {on_counts}, off_counts = {off_counts}')
             # p.set_duty_cycles(0, [0])
-            p1.set_us(3, [1600])
+            p1.set_us(__BRV_ID , [1700])
             on_counts, off_counts = p1.get_counts(0)
             print(f' After on_counts = {on_counts}, off_counts = {off_counts}')
 
