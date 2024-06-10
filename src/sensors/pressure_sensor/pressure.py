@@ -35,11 +35,14 @@ def pres_pub():
     rate = rospy.Rate(10) # 10hz
 
     while not rospy.is_shutdown():
-        sensor.read()
+        try:
+            sensor.read()
 
-        # pres_raw.data = sensor.pressure() # ms5837.UNITS_Torr | ms5837.UNITS_psi | ms5837.UNITS_atm default mbar
-        temp_raw.data = sensor.temperature(UNITS_Farenheit) # ms5837.UNITS_Farenheit | ms5837.UNITS_Kelvin | ms5837.UNITS_Centigrade default Celcius
-        depth_raw.data = sensor.depth() # m
+            # pres_raw.data = sensor.pressure() # ms5837.UNITS_Torr | ms5837.UNITS_psi | ms5837.UNITS_atm default mbar
+            temp_raw.data = sensor.temperature(UNITS_Farenheit) # ms5837.UNITS_Farenheit | ms5837.UNITS_Kelvin | ms5837.UNITS_Centigrade default Celcius
+            depth_raw.data = sensor.depth() # m
+        except IOError as ioe:
+            print('I2C Error')
 
         pressure.publish(pres_raw)
         temperature.publish(temp_raw)   
