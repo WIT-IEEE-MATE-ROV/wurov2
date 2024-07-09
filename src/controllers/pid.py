@@ -95,7 +95,9 @@ class QuatPIDController:
         if self.error.w < 0:
             self.error = -self.error
 
-        dt = time.time() - self.previous_time
+        current_time = time.time()
+        dt = current_time - self.previous_time
+        self.previous_time = current_time
 
         outputs = [0] * 3
 
